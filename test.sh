@@ -5,8 +5,7 @@ assert() {
 
     input="$2"
 
-    clang main.c -o rvcc
-    ./rvcc $input > tmp.s || exit
+    ./rvcc "$input" > tmp.s || exit
     
     riscv64-unknown-linux-gnu-gcc -static -o tmp tmp.s
 
@@ -24,6 +23,8 @@ assert() {
 
 assert 0 0
 assert 41 41
+assert 34 12-34+56
+assert 41 ' 12 + 34 - 5'
 # assert 2 99
 
 echo OK
