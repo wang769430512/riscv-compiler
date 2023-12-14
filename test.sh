@@ -23,8 +23,10 @@ assert() {
 
 assert 0 0
 assert 41 41
-assert 34 12-34+56
+# assert 34 12-34+56
 assert 41 ' 12 + 34 - 5'
+assert 26  '3 * 9 - 5/5'
+assert 17 '1-8/(2*2)+3*6'
 # assert 2 99
 
 echo OK

@@ -1,3 +1,5 @@
+#include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,20 +62,6 @@ static void errorTok(Token *Tok, char *Fmt, ...) {
     verrorAt(Tok->Loc, Fmt, VA);
 }
 
-static int isspace(char ch) {
-    if (ch == ' ') {
-        return 1;
-    }
-    return 0;
-}
-
-static int isdigit(char ch) {
-    if (ch >= '0' && ch <='9') {
-        return 1;
-    }
-    return 0;
-}
-
 static bool equal(Token *Tok, char *Str) {
 
     return memcmp(Tok->Loc, Str, Tok->Len)==0 && Str[Tok->Len]=='\0';
@@ -124,11 +112,10 @@ static Token *tokenize() {
             continue;
         }
 
-        if (*P == '+' || *P == '-') {
+        if (ispunct(*P)) {
             // 操作符长度都为1
             Cur->Next = newToken(TK_PUNCT, P, P + 1);
             Cur = Cur->Next;
-            const char *oldPtr = P;
             ++P;
             continue;
         }
@@ -137,6 +124,165 @@ static Token *tokenize() {
     Cur->Next = newToken(TK_EOF, P, P);
 
     return Head.Next;
+}
+
+typedef enum {
+    ND_ADD,
+    ND_SUB,
+    ND_MUL,
+    ND_DIV,
+    ND_NUM,
+} NodeKind;
+
+typedef struct Node Node;
+struct Node {
+    NodeKind Kind; // node kind
+    Node *LHS; // left-hand side
+    Node *RHS; // right-hand side
+    int Val; 
+};
+
+static Node *newNode(NodeKind Kind) {
+    Node *Nd = calloc(1, sizeof(Node));
+    Nd->Kind = Kind;
+    return Nd;
+}
+
+static Node *newNum(int Val) {
+    Node* Nd = newNode(ND_NUM);
+    Nd->Val = Val;
+    return Nd;
+}
+
+
+
+// create a new binary tree
+static Node *newBinary(NodeKind Kind, Node* LHS, Node* RHS) {
+    Node *Nd = newNode(Kind);
+    Nd->LHS = LHS;
+    Nd->RHS = RHS;
+
+    return Nd;
+}
+
+// expr = mul("+"mul | "-"mul)*
+// mul = primary ("*" primary | "/" primary)*
+// primary = "("expr")" | num
+
+static Node *expr(Token **Rest, Token *Tok);
+static Node *mul(Token **Rest, Token *Tok);
+static Node *primary(Token **Rest, Token *Tok);
+
+// expr = mul("+"mul | "-"mul)*
+static Node *expr(Token **Rest, Token *Tok) {
+    Node *Nd = mul(&Tok, Tok);
+
+    while (true) {
+        if (equal(Tok, "+")) {
+            Nd = newBinary(ND_ADD, Nd, mul(&Tok, Tok->Next));
+            continue;
+        }
+
+        if (equal(Tok, "-")) {
+            Nd = newBinary(ND_SUB, Nd, mul(&Tok, Tok->Next));
+            continue;
+        }
+
+        *Rest = Tok;
+        return Nd;
+    }
+
+    errorTok(Tok, "expected an expression");
+
+    return NULL;
+}
+
+// mul = primary("*" primary | "/" primary)
+static Node *mul(Token **Rst, Token *Tok) {
+    Node *Nd = primary(&Tok, Tok);
+
+    while (true) {
+        if (equal(Tok, "*")) {
+            Nd = newBinary(ND_MUL, Nd, primary(&Tok, Tok->Next));
+            continue;
+        }
+
+        if (equal(Tok, "/")) {
+            Nd = newBinary(ND_DIV, Nd, primary(&Tok, Tok->Next));
+            continue;
+        }
+
+        *Rst = Tok;
+        return Nd;
+    }
+}
+
+// primary = "("expr")" | num
+static Node *primary(Token **Rest, Token *Tok) {
+    if (equal(Tok, "(")) {
+        Node *Nd = expr(&Tok, Tok->Next);
+        *Rest = skip(Tok, ")");
+        return Nd;
+    }
+
+    if (Tok->Kind == TK_NUM) {
+        Node *Nd = newNum(Tok->Val);
+        *Rest = Tok->Next;
+        return Nd;
+    }
+
+    errorTok(Tok, "expected an expression");
+    return NULL;
+}
+
+static int Depth;
+
+static void push(void) {
+    printf("  addi sp, sp, -8\n");
+    printf("  sd a0, 0(sp)\n");
+    Depth++;
+}
+
+static void pop(char *Reg) {
+    printf("  ld %s, 0(sp)\n", Reg);
+    printf("  addi sp, sp, 8\n");
+    Depth--;
+}
+
+static void genExpr(Node *Nd) {
+    if (Nd->Kind == ND_NUM) {
+        printf("  li a0, %d\n", Nd->Val);
+        return;
+    } 
+
+    // 递归到最右节点
+    genExpr(Nd->RHS);
+    // 将结果入栈
+    push();
+    // 递归到左节点
+    genExpr(Nd->LHS);
+    // 将结果弹到a1
+    pop("a1");
+
+    // 生成各个二叉树节点
+    switch (Nd->Kind) {
+        case ND_ADD: // + a0 = a0 + a1;
+            printf("  add a0, a0, a1\n");
+            return;
+        case ND_SUB: // - a0 = a0 - a1;
+            printf("  sub a0, a0, a1\n");
+            return;
+        case ND_MUL: // * a0 = a0 * a1;
+            printf("  mul a0, a0, a1\n");
+            return;
+        case ND_DIV: // / a0 = a0 / a1;
+            printf("  div a0, a0, a1\n");
+            return;
+        default:
+            break;
+    }
+
+    error("invalid expression");
 }
 
 int main(int argc, char **argv)
@@ -148,24 +294,23 @@ int main(int argc, char **argv)
     CurrentInput = argv[1];
     Token *Tok = tokenize();
 
+    Node *Node = expr(&Tok, Tok);
+
+    if (Tok->Kind != TK_EOF) {
+        errorTok(Tok, "extra token");
+    }
+    
+
     printf("  .globl main\n");
     printf("main:\n");
-    printf("  li a0, %d\n", Tok->Val);
-    Tok=Tok->Next;
-    while (Tok->Kind != TK_EOF) {
-        if (equal(Tok, "+")) {
-            Tok = Tok->Next;
-            printf("  addi a0, a0, %d\n", getNumber(Tok));
-            Tok = Tok->Next;  
-            continue;
-        } 
 
-        Tok = skip(Tok, "-");
-        printf("  addi a0, a0, -%d\n", getNumber(Tok));
-        Tok = Tok->Next;
-    }
+    // 遍历AST树生成汇编
+    genExpr(Node);
 
     printf("  ret\n");
+
+    // 如果栈未清空，则报错
+    assert(Depth == 0);
 
     return 0;
 }
