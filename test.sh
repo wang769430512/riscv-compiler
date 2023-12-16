@@ -27,6 +27,10 @@ assert 41 41
 assert 41 ' 12 + 34 - 5'
 assert 26  '3 * 9 - 5/5'
 assert 17 '1-8/(2*2)+3*6'
+assert 1 '-2----3'
+assert 1 '1!=2'
+assert 1 '2>=1'
+assert 1 '1<=100'
 # assert 2 99
 
 echo OK
