@@ -1,8 +1,13 @@
 CFLAGS=-std=c11 -g -fno-common
 CC=clang
+SRCS=$(wildcard *.c)
+OBJS=${SRCS:.c=.o}
+#OBJS=${SRCS:*.c=*.o}
 
-rvcc: main.o
-	$(CC) -o rvcc $(CFLAGS) main.o
+rvcc:${OBJS}
+	$(CC) ${CFLAGS} -o $@ $^ ${LDFLAGS}
+
+${OBJS}:rvcc.h
 
 test: rvcc
 	./test.sh
