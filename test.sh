@@ -21,16 +21,27 @@ assert() {
     fi
 }
 
-assert 0 0
-assert 41 41
+assert 0 '0;'
+assert 41 '41;'
 # assert 34 12-34+56
-assert 41 ' 12 + 34 - 5'
-assert 26  '3 * 9 - 5/5'
-assert 17 '1-8/(2*2)+3*6'
-assert 1 '-2----3'
-assert 1 '1!=2'
-assert 1 '2>=1'
-assert 1 '1<=100'
-# assert 2 99
+assert 41 ' 12 + 34 - 5;'
+assert 26  '3 * 9 - 5/5;'
+assert 17 '1-8/(2*2)+3*6;'
+assert 1 '-2----3;'
+assert 1 '1!=2;'
+assert 1 '2>=1;'
+assert 1 '1<=100;'
+assert 3 '1;2;3;'
+assert 12 '9*9;100-101;76/6;'
+# assert 2 '99;'
+
+# [10] 支持单字母变量
+assert 3 'a=3; a;'
+assert 5 'a=3; z=5;'
+assert 6 'a=b=3; a+b;'
+assert 5 'a=3;b=4;a=1;a+b;'
+assert 4 'a=3; a+ 1;'
+
+# 
 
 echo OK

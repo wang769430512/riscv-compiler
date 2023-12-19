@@ -33,15 +33,29 @@ static Node *newUnary(NodeKind Kind, Node *child)
     return Nd;
 }
 
+static Node *newVarNode(char Name) {
+    Node *Nd = newNode(ND_VAR);
+    Nd->Name = Name;
 
-// expr = equality
+    return Nd;
+}
+
+// program = stmt*
+// stmt = exprStmt
+// exprStmt = expr ";"
+// expr = assign
+// assign = equality ("=" assign)?
 // equality = relational("==" relational | "!=" relational )*
 // relational = add("<=" add | "<" add | ">=" add | ">" add)*
 // add = mul("+"mul | "-"mul)*
 // mul = unary ("*" unary | "/" unary)*
 // unary = ("+" | "-") unary | primary
-// primary = "("expr")" | num
+// primary = "("expr")" | ident | num
+static Node *program(Token **Rest, Token *Tok);
+static Node *stmt(Token **Rest, Token *Tok);
+static Node *exprStmt(Token **Rest, Token *Tok);
 static Node *expr(Token **Rest, Token *Tok);
+static Node *assign(Token **Rest, Token *Tok);
 static Node *equality(Token **Rest, Token *Tok);
 static Node *relational(Token **Rest, Token *Tok);
 static Node *add(Token **Rest, Token *Tok);
@@ -49,22 +63,51 @@ static Node *mul(Token **Rest, Token *Tok);
 static Node *unary(Token **Rest, Token *Tok);
 static Node *primary(Token **Rest, Token *Tok);
 
-Node *parse(Token **Rest, Token *Tok) {
-    Node *Nd = expr(&Tok, Tok);
-
-    if (Tok->Kind != TK_EOF)
+// program = stmt*
+Node *parse(Token *Tok) {
+    //Node *Nd = stmt(&Tok, Tok);
+    Node Head = {};
+    Node *Cur = &Head;
+    
+    while (Tok->Kind != TK_EOF)
     {
-        errorTok(Tok, "extra token");
+        Cur->Next = stmt(&Tok, Tok);
+        Cur = Cur->Next;
     }
 
+    return Head.Next;
+}
+
+// stmt = expr
+static Node *stmt(Token **Rest, Token *Tok) {
+    return exprStmt(Rest, Tok);
+}
+
+// exprStmt = expr ";"
+static Node *exprStmt(Token **Rest, Token *Tok) {
+    Node *Nd = newUnary(ND_EXPR_STMT, expr(&Tok, Tok));
+    *Rest = skip(Tok, ";");    
     return Nd;
 }
 
+
+
 // expr = equality
 static Node *expr(Token **Rest, Token *Tok) {
-    return equality(Rest, Tok);
+    return assign(Rest, Tok);
 }
 
+// assign = equality ("=" assign)?
+static Node *assign(Token **Rest, Token *Tok) {
+    Node *Nd = equality(&Tok, Tok);
+
+    if (equal(Tok, "=")) {
+        Nd = newBinary(ND_ASSIGN, Nd, assign(&Tok, Tok->Next));
+    }
+    *Rest = Tok;
+    return Nd;
+    
+}
 
 // equality = relational("==" relational | "!=" relational)
 static Node *equality(Token **Rest, Token *Tok) {
@@ -189,13 +232,19 @@ static Node *unary(Token **Rest, Token *Tok)
     return primary(Rest, Tok);
 }
 
-// primary = "("expr")" | num
+// primary = "("expr")" | ident | num
 static Node *primary(Token **Rest, Token *Tok)
 {
     if (equal(Tok, "("))
     {
         Node *Nd = expr(&Tok, Tok->Next);
         *Rest = skip(Tok, ")");
+        return Nd;
+    }
+
+    if (Tok->Kind == TK_IDENT) {
+        Node *Nd = newVarNode(*Tok->Loc);
+        *Rest = Tok->Next;
         return Nd;
     }
 

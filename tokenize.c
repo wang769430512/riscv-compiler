@@ -17,7 +17,7 @@ void error(char *Fmt, ...)
 }
 
 
-void verrorAt(char *Loc, char *Fmt, va_list VA)
+static void verrorAt(char *Loc, char *Fmt, va_list VA)
 {
     fprintf(stderr, "%s\n", CurrentInput);
 
@@ -28,7 +28,6 @@ void verrorAt(char *Loc, char *Fmt, va_list VA)
     fprintf(stderr, Fmt, VA);
     fprintf(stderr, "\n");
     va_end(VA);
-    exit(1);
 }
 
 void errorAt(char *Loc, char *Fmt, ...)
@@ -36,6 +35,7 @@ void errorAt(char *Loc, char *Fmt, ...)
     va_list VA;
     va_start(VA, Fmt);
     verrorAt(Loc, Fmt, VA);
+    exit(1);
 }
 
 void errorTok(Token *Tok, char *Fmt, ...)
@@ -43,6 +43,7 @@ void errorTok(Token *Tok, char *Fmt, ...)
     va_list VA;
     va_start(VA, Fmt);
     verrorAt(Tok->Loc, Fmt, VA);
+    exit(1);
 }
 
 bool equal(Token *Tok, char *Str)
@@ -93,9 +94,9 @@ static Token *newToken(TokenKind Kind, char *Start, char *End)
     return Tok;
 }
 
-Token *tokenize(char *Input)
+Token *tokenize(char *P)
 {
-    char *P = Input;
+    CurrentInput = P;
     Token Head = {};
     Token *Cur = &Head;
 
@@ -118,8 +119,15 @@ Token *tokenize(char *Input)
             continue;
         }
 
+        if ('a' <= *P && *P <= 'z') {
+            Cur->Next = newToken(TK_IDENT, P, P+1);
+            Cur = Cur->Next;
+            ++P;
+            continue;
+        }
+
         int PunctLen = readPunct(P);
-        if (PunctLen > 0) {
+        if (PunctLen) {
             Cur->Next = newToken(TK_PUNCT, P, P+PunctLen);
             Cur = Cur->Next;
             P += PunctLen;

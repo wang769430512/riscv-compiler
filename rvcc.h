@@ -8,6 +8,7 @@
 
 typedef enum
 {
+    TK_IDENT, // 标记符，可以为变量名、函数名
     TK_PUNCT,
     TK_NUM,
     TK_EOF,
@@ -25,7 +26,7 @@ struct Token
 Token *tokenize(char *Input);
 
 void error(char *Fmt, ...);
-void verrorAt(char *Loc, char *Fmt, va_list VA);
+//void verrorAt(char *Loc, char *Fmt, va_list VA);
 void errorAt(char *Loc, char *Fmt, ...);
 void errorTok(Token *Tok, char *Fmt, ...);
 
@@ -47,6 +48,9 @@ typedef enum
     ND_LE, // <=
     ND_GT, // >
     ND_GE, // >=
+    ND_ASSIGN, // 赋值
+    ND_EXPR_STMT, // 表达式语句
+    ND_VAR, // 变量
 } NodeKind;
 
 
@@ -56,8 +60,10 @@ struct Node
     NodeKind Kind; // node kind
     Node *LHS;     // left-hand side
     Node *RHS;     // right-hand side
+    Node *Next;    // 指向下一个语句  
+    char Name;     // 存储ND_VAR的字符串
     int Val;
 };
 
-Node *parse(Token** Rest, Token* Tok);
+Node *parse(Token* Tok);
 void codegen(Node* Nd);
