@@ -1,5 +1,7 @@
 #include "rvcc.h"
 
+Obj* Locals;
+
 static Node *newNode(NodeKind Kind)
 {
     Node *Nd = calloc(1, sizeof(Node));
@@ -33,15 +35,33 @@ static Node *newUnary(NodeKind Kind, Node *child)
     return Nd;
 }
 
-static Node *newVarNode(char Name) {
-    Node *Nd = newNode(ND_VAR);
-    Nd->Name = Name;
+static Obj *newLVar(char *Name) {
+    Obj *Var = calloc(1, sizeof(Obj));
+    Var->Name = Name;
+    Var->Next = Locals;
+    Locals = Var;
+    
+    return Var;
+}
 
+static Node *newVarNode(Obj *Var) {
+    Node *Nd = newNode(ND_VAR);
+    Nd->Name = Var;
     return Nd;
 }
 
+static Obj *findVar(Token *Tok) {
+    for (Obj *Var=Locals; Var; Var=Var->Next) {
+        if (strlen(Var->Name) == Tok->Len && (!strncmp(Var->Name, Tok->Loc, Tok->Len))) {
+            return Var;
+        } 
+    }
+
+    return NULL;
+}
+
 // program = stmt*
-// stmt = exprStmt
+// stmt =  "return" expr ";" | exprStmt
 // exprStmt = expr ";"
 // expr = assign
 // assign = equality ("=" assign)?
@@ -63,23 +83,13 @@ static Node *mul(Token **Rest, Token *Tok);
 static Node *unary(Token **Rest, Token *Tok);
 static Node *primary(Token **Rest, Token *Tok);
 
-// program = stmt*
-Node *parse(Token *Tok) {
-    //Node *Nd = stmt(&Tok, Tok);
-    Node Head = {};
-    Node *Cur = &Head;
-    
-    while (Tok->Kind != TK_EOF)
-    {
-        Cur->Next = stmt(&Tok, Tok);
-        Cur = Cur->Next;
-    }
-
-    return Head.Next;
-}
-
-// stmt = expr
+// stmt = "return" expr ";"| exprStmt
 static Node *stmt(Token **Rest, Token *Tok) {
+    if (equal(Tok, "return")) {
+        Node *Nd = newUnary(ND_RETURN, expr(&Tok, Tok->Next));
+        *Rest = skip(Tok, ";");
+        return Nd;
+    }
     return exprStmt(Rest, Tok);
 }
 
@@ -89,8 +99,6 @@ static Node *exprStmt(Token **Rest, Token *Tok) {
     *Rest = skip(Tok, ";");    
     return Nd;
 }
-
-
 
 // expr = equality
 static Node *expr(Token **Rest, Token *Tok) {
@@ -188,7 +196,6 @@ static Node *add(Token **Rest, Token *Tok)
     return NULL;
 }
 
-
 // mul = unary("*" unary | "/" unary)
 static Node *mul(Token **Rest, Token *Tok)
 {
@@ -243,9 +250,13 @@ static Node *primary(Token **Rest, Token *Tok)
     }
 
     if (Tok->Kind == TK_IDENT) {
-        Node *Nd = newVarNode(*Tok->Loc);
+        Obj *Var =findVar(Tok);
+        if (!Var) {
+            Var =newLVar(strndup(Tok->Loc, Tok->Len));
+        }
+        
         *Rest = Tok->Next;
-        return Nd;
+        return newVarNode(Var);
     }
 
     if (Tok->Kind == TK_NUM)
@@ -259,3 +270,22 @@ static Node *primary(Token **Rest, Token *Tok)
     return NULL;
 }
 
+
+// program = stmt*
+Function *parse(Token *Tok) {
+    Node Head = {};
+    Node *Cur = &Head;
+    
+    // stmt*
+    while (Tok->Kind != TK_EOF)
+    {
+        Cur->Next = stmt(&Tok, Tok);
+        Cur = Cur->Next;
+    }
+
+    Function *prog = calloc(1, sizeof(Function));;
+    prog->Body = Head.Next;
+    prog->Locals = Locals;
+
+    return prog;
+}

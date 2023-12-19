@@ -2,8 +2,7 @@
 
 static char *CurrentInput;
 
-void error(char *Fmt, ...)
-{
+void error(char *Fmt, ...) {
     // 定义一个va_list variable
     va_list VA;
     // VA获取Fmt后面的所有参数
@@ -16,38 +15,33 @@ void error(char *Fmt, ...)
     exit(1);
 }
 
-
-static void verrorAt(char *Loc, char *Fmt, va_list VA)
-{
+static void verrorAt(char *Loc, char *Fmt, va_list VA) {
     fprintf(stderr, "%s\n", CurrentInput);
 
     int Pos = Loc - CurrentInput;
 
-    fprintf(stderr, "%*s", Pos, " ");
+    fprintf(stderr, "%*s", Pos, "");
     fprintf(stderr, "^ ");
-    fprintf(stderr, Fmt, VA);
+    vfprintf(stderr, Fmt, VA);
     fprintf(stderr, "\n");
     va_end(VA);
 }
 
-void errorAt(char *Loc, char *Fmt, ...)
-{
+void errorAt(char *Loc, char *Fmt, ...) {
     va_list VA;
     va_start(VA, Fmt);
     verrorAt(Loc, Fmt, VA);
     exit(1);
 }
 
-void errorTok(Token *Tok, char *Fmt, ...)
-{
+void errorTok(Token *Tok, char *Fmt, ...) {
     va_list VA;
     va_start(VA, Fmt);
     verrorAt(Tok->Loc, Fmt, VA);
     exit(1);
 }
 
-bool equal(Token *Tok, char *Str)
-{
+bool equal(Token *Tok, char *Str) {
 
     return memcmp(Tok->Loc, Str, Tok->Len) == 0 && Str[Tok->Len] == '\0';
 }
@@ -71,21 +65,7 @@ static int getNumber(Token *Tok)
     return Tok->Val;
 }
 
-static bool startWith(char *Str, char *SubStr) {
-    return strncmp(Str, SubStr, strlen(SubStr)) == 0;
-}
-
-static int readPunct(char *Ptr) {
-    if (startWith(Ptr, "==") || startWith(Ptr, "!=") || startWith(Ptr, ">=") \
-       || startWith(Ptr, "<=")) {
-        return 2;
-    }
-
-    return (ispunct(*Ptr)) ? 1:0;    
-}
-
-static Token *newToken(TokenKind Kind, char *Start, char *End)
-{
+static Token *newToken(TokenKind Kind, char *Start, char *End) {
     // 分配1个Token的内存空间
     Token *Tok = calloc(1, sizeof(Token));
     Tok->Kind = Kind;
@@ -94,23 +74,48 @@ static Token *newToken(TokenKind Kind, char *Start, char *End)
     return Tok;
 }
 
-Token *tokenize(char *P)
-{
+static bool startsWith(char *Str, char *SubStr) {
+    return strncmp(Str, SubStr, strlen(SubStr)) == 0;
+}
+
+static bool isIdent1(char C) {
+    return ('a' <= C && C <= 'z') || ('A' <= C && C <= 'Z') || C == '_'; 
+}
+
+static bool isIdent2(char C) {
+    return isIdent1(C) || ('0' <= C && C <= '9');
+}
+
+static int readPunct(char *Ptr) {
+    if (startsWith(Ptr, "==") || startsWith(Ptr, "!=") || startsWith(Ptr, "<=") \
+     || startsWith(Ptr, ">=")) {
+        return 2;
+    }
+
+    return (ispunct(*Ptr)) ? 1:0;    
+} 
+
+static void convertKeywords(Token *Tok) {
+    for (Token *T = Tok; T->Kind != TK_EOF; T = T->Next) {
+        if (equal(T, "return")) {
+            T->Kind = TK_KEYWORD;
+        }
+    }
+}
+
+Token *tokenize(char *P) {
     CurrentInput = P;
     Token Head = {};
     Token *Cur = &Head;
 
-    while (*P)
-    {
+    while (*P) {
         // 跳过所有空白符，如：空白、回车
-        if (isspace(*P))
-        {
+        if (isspace(*P)) {
             ++P;
             continue;
         }
 
-        if (isdigit(*P))
-        {
+        if (isdigit(*P)) {
             Cur->Next = newToken(TK_NUM, P, P);
             Cur = Cur->Next;
             const char *OldPtr = P;
@@ -119,24 +124,28 @@ Token *tokenize(char *P)
             continue;
         }
 
-        if ('a' <= *P && *P <= 'z') {
-            Cur->Next = newToken(TK_IDENT, P, P+1);
+        if (isIdent1(*P)) {
+            char *Start = P;
+            do {
+              ++P;  
+            } while (isIdent2(*P));
+            Cur->Next = newToken(TK_IDENT, Start, P);
             Cur = Cur->Next;
-            ++P;
+            
             continue;
         }
 
         int PunctLen = readPunct(P);
         if (PunctLen) {
-            Cur->Next = newToken(TK_PUNCT, P, P+PunctLen);
+            Cur->Next = newToken(TK_PUNCT, P, P + PunctLen);
             Cur = Cur->Next;
             P += PunctLen;
             continue;
         }
                   
-        errorAt(P, "Invalid token");
+        errorAt(P, "invalid token");
     }
     Cur->Next = newToken(TK_EOF, P, P);
-
+    convertKeywords(Head.Next);
     return Head.Next;
 }

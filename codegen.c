@@ -17,10 +17,13 @@ static void pop(char *Reg)
     Depth--;
 }
 
+static int alignTo(int N, int Allign) {
+    return (N + Allign - 1) / Allign * Allign;
+}
+
 static void genAddr(Node *Nd) {
     if (Nd->Kind == ND_VAR) {
-        int offset = (Nd->Name - 'a' + 1) * 8;
-        printf("  addi a0, fp, %d\n", -offset);
+        printf("  addi a0, fp, %d\n", Nd->Name->offset);
         return;
     }
 
@@ -102,15 +105,33 @@ static void genExpr(Node *Nd)
 }
 
 static void genStmt(Node *Nd) {
-    if (Nd->Kind == ND_EXPR_STMT) {
-        genExpr(Nd->LHS);
-        return;
+    switch(Nd->Kind) {
+        case ND_RETURN:
+            genExpr(Nd->LHS);
+            printf("  j .L.return\n");
+            return;
+        case ND_EXPR_STMT:
+            genExpr(Nd->LHS);
+            return;
+        default:
+            break;
     }
 
     error("Invalid statement");
 }
 
-void codegen(Node* Nd) {
+static void assignLVarOffsets(Function* proc) {
+    int offset = 0;
+    for (Obj* Var = proc->Locals; Var; Var = Var->Next) {
+        offset += 8;
+        Var->offset = -offset;
+    }
+
+    proc->StackSize = alignTo(offset, 16);
+}
+
+void codegen(Function* Prog) {
+    assignLVarOffsets(Prog);
     printf("  .globl main\n");
     printf("main:\n");
 
@@ -118,13 +139,10 @@ void codegen(Node* Nd) {
     //------------------------------------------//sp
     //                    fp                      fp = sp - 8
     //------------------------------------------//fp
-    //                    'a'                     fp - 8
-    //                    'b'                     fp - 16
-    //                    ...
-    //                    'z'                     fp - 208
-    //-----------------------------------------//sp = sp - 8 - 216
+    //                   变量
+    //-----------------------------------------//sp = sp - 8 - stackSize
     //                 表达式计算
-    //-----------------------------------------
+    //-----------------------------------------//
 
     // Prologue, 前言
     // 将fp压入栈中，保存fp的值
@@ -133,15 +151,15 @@ void codegen(Node* Nd) {
 
     printf("  mv fp, sp\n");
 
-    printf("  addi sp, sp, -208\n");
+    printf("  addi sp, sp, -%d\n", Prog->StackSize);
     // 遍历AST树生成汇编
-    for (Node *N = Nd; N; N=N->Next) {
+    for (Node *N = Prog->Body; N; N=N->Next) {
         genStmt(N);
          // 如果栈未清空，则报错
         assert(Depth == 0);
     }
 
-    //printf("  addi sp, sp, 208\n"); 
+    printf(".L.return:\n");
     printf("  mv sp, fp\n");
     printf("  ld fp, 0(sp)\n");   
     printf("  addi sp, sp, 8\n");

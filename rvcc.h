@@ -6,13 +6,18 @@
 #include <stdbool.h>
 #include <stdarg.h>
 
+#define _POSIX_C_SOURCE 200809L
+
 typedef enum
 {
     TK_IDENT, // 标记符，可以为变量名、函数名
     TK_PUNCT,
+    TK_KEYWORD,
     TK_NUM,
     TK_EOF,
 } TokenKind;
+
+typedef struct Node Node;
 
 typedef struct Token Token;
 struct Token
@@ -48,22 +53,36 @@ typedef enum
     ND_LE, // <=
     ND_GT, // >
     ND_GE, // >=
+    ND_RETURN, // return
     ND_ASSIGN, // 赋值
     ND_EXPR_STMT, // 表达式语句
     ND_VAR, // 变量
 } NodeKind;
 
+typedef struct Obj Obj;
+struct Obj {
+    Obj *Next;
+    char *Name;
+    int offset;
+};
 
-typedef struct Node Node;
 struct Node
 {
     NodeKind Kind; // node kind
     Node *LHS;     // left-hand side
     Node *RHS;     // right-hand side
     Node *Next;    // 指向下一个语句  
-    char Name;     // 存储ND_VAR的字符串
+    Obj *Name;     // 存储ND_VAR的字符串
     int Val;
 };
 
-Node *parse(Token* Tok);
-void codegen(Node* Nd);
+// function
+typedef struct Function Function;
+struct Function {
+    Node *Body;
+    Obj *Locals;
+    int StackSize;
+};
+
+Function *parse(Token *Tok);
+void codegen(Function *Prog);
