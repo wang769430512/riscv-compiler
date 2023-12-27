@@ -55,6 +55,9 @@ typedef enum
     ND_GE, // >=
     ND_RETURN, // return
     ND_ASSIGN, // 赋值
+    ND_IF,
+    ND_FOR, // "for" or "while"
+    ND_BLOCK,  // { ... }, 代码块
     ND_EXPR_STMT, // 表达式语句
     ND_VAR, // 变量
 } NodeKind;
@@ -71,6 +74,17 @@ struct Node
     NodeKind Kind; // node kind
     Node *LHS;     // left-hand side
     Node *RHS;     // right-hand side
+
+    // "if"语句 or "for"语句
+    Node *Cond;
+    Node *Then;
+    Node *Els;
+    Node* Init;
+    Node* Inc;
+
+    // 代码块
+    Node *Body;
+    
     Node *Next;    // 指向下一个语句  
     Obj *Name;     // 存储ND_VAR的字符串
     int Val;

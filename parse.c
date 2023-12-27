@@ -60,9 +60,15 @@ static Obj *findVar(Token *Tok) {
     return NULL;
 }
 
-// program = stmt*
-// stmt =  "return" expr ";" | exprStmt
-// exprStmt = expr ";"
+// program = "{" compoundStmt
+// compondStmt = stmt* "}"
+// stmt =  ""return" expr ";"
+//        | "if" "(" expr ")" stmt ("else" stmt)? 
+//        | "for" "(" exprStmt expr?";" expr? ";" expr? ";")" stmt
+//        | "while" "(" expr ")" stmt
+//        | "{" compondStmt 
+//        | exprStmt
+// exprStmt = expr? ";"
 // expr = assign
 // assign = equality ("=" assign)?
 // equality = relational("==" relational | "!=" relational )*
@@ -72,6 +78,7 @@ static Obj *findVar(Token *Tok) {
 // unary = ("+" | "-") unary | primary
 // primary = "("expr")" | ident | num
 static Node *program(Token **Rest, Token *Tok);
+static Node *compondStmt(Token **Rest, Token *Tok);
 static Node *stmt(Token **Rest, Token *Tok);
 static Node *exprStmt(Token **Rest, Token *Tok);
 static Node *expr(Token **Rest, Token *Tok);
@@ -83,18 +90,98 @@ static Node *mul(Token **Rest, Token *Tok);
 static Node *unary(Token **Rest, Token *Tok);
 static Node *primary(Token **Rest, Token *Tok);
 
-// stmt = "return" expr ";"| exprStmt
+// compondStmt = stmt* "}"
+static Node *compondStmt(Token **Rest, Token *Tok) {
+    Node Head = {};
+    Node *Cur = &Head;
+
+    while (!equal(Tok, "}")) {
+        Cur->Next = stmt(&Tok, Tok);       
+        Cur = Cur->Next;
+    } 
+
+    Node *Nd = newNode(ND_BLOCK);
+    Nd->Body = Head.Next;
+    *Rest = Tok->Next;
+
+    return Nd;
+}
+
+// stmt = "return" expr ";"
+//      | "if" "(" expr ")" stmt ("else" stmt)?
+//      | "for" "(" exprStmt expr?";" expr?";" expr? ")" stmt
+//      | "while" "(" expr")" stmt
+//      | "{" compondStmt 
+//      | exprStmt
 static Node *stmt(Token **Rest, Token *Tok) {
     if (equal(Tok, "return")) {
         Node *Nd = newUnary(ND_RETURN, expr(&Tok, Tok->Next));
         *Rest = skip(Tok, ";");
         return Nd;
     }
+
+    if (equal(Tok, "if")) {
+        Node *Nd = newNode(ND_IF);
+        Tok = skip(Tok->Next, "(");
+        Nd->Cond = expr(&Tok, Tok);
+        Tok = skip(Tok, ")");
+        Nd->Then = stmt(&Tok, Tok);
+        if (equal(Tok, "else")) {
+            Nd->Els =stmt(&Tok, Tok->Next);
+        }
+        *Rest = Tok;
+        return Nd;
+    }
+
+    // "for" "(" exprStmt expr?";" expr?";" expr? ")" stmt
+    if (equal(Tok, "for")) {
+        Node *Nd = newNode(ND_FOR);
+        Tok = skip(Tok->Next, "(");
+        
+        // exprStm
+        Nd->Init = exprStmt(&Tok, Tok);
+
+        // expr?
+        if (!equal(Tok, ";"))
+            Nd->Cond = expr(&Tok, Tok);
+
+        Tok = skip(Tok, ";");
+
+        // expr?
+        if (!equal(Tok, ")")) {
+            Nd->Inc = expr(&Tok, Tok);
+        }    
+
+        Tok = skip(Tok, ")");
+
+        Nd->Then = stmt(Rest, Tok);    
+
+        return Nd;
+    }
+
+    // "while" "(" expr")" stmtd
+    if (equal(Tok, "while")) {
+        Node *Nd = newNode(ND_FOR);
+        Tok = skip(Tok->Next, "(");
+        Nd->Cond = expr(&Tok, Tok);
+        Tok = skip(Tok, ")");
+        Nd->Then = stmt(Rest, Tok);
+        return Nd;
+    }
+
+    if (equal(Tok, "{")) {
+        return compondStmt(Rest, Tok->Next);
+    }
+
     return exprStmt(Rest, Tok);
 }
 
-// exprStmt = expr ";"
+// exprStmt = expr? ";"
 static Node *exprStmt(Token **Rest, Token *Tok) {
+    if (equal(Tok, ";")) {
+        *Rest = Tok->Next;
+        return newNode(ND_BLOCK);
+    }
     Node *Nd = newUnary(ND_EXPR_STMT, expr(&Tok, Tok));
     *Rest = skip(Tok, ";");    
     return Nd;
@@ -270,21 +357,13 @@ static Node *primary(Token **Rest, Token *Tok)
     return NULL;
 }
 
-
-// program = stmt*
+// program = "{" CompondStmt
 Function *parse(Token *Tok) {
-    Node Head = {};
-    Node *Cur = &Head;
-    
-    // stmt*
-    while (Tok->Kind != TK_EOF)
-    {
-        Cur->Next = stmt(&Tok, Tok);
-        Cur = Cur->Next;
-    }
+
+    Tok = skip(Tok, "{");
 
     Function *prog = calloc(1, sizeof(Function));;
-    prog->Body = Head.Next;
+    prog->Body = compondStmt(&Tok, Tok);
     prog->Locals = Locals;
 
     return prog;

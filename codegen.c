@@ -2,6 +2,11 @@
 
 static int Depth;
 
+static int count(void) {
+    static int I = 1;
+    return I++;
+}
+
 static void push(void)
 {
     printf("  addi sp, sp, -8\n");
@@ -106,6 +111,44 @@ static void genExpr(Node *Nd)
 
 static void genStmt(Node *Nd) {
     switch(Nd->Kind) {
+        case ND_IF: {
+            // 代码段计数
+            int C = count();
+            genExpr(Nd->Cond);
+            printf("  beqz a0, .L.else.%d\n", C);
+            genStmt(Nd->Then);
+            printf("  j .L.end.%d\n", C);
+            printf(".L.else.%d:\n", C);
+            if (Nd->Els) {
+                genStmt(Nd->Els);
+                printf(".L.end.%d:\n", C);
+            }
+            return;
+        }
+        case ND_FOR: {
+            int C = count();
+            if (Nd->Init) {
+                genStmt(Nd->Init);
+            }
+            printf(".L.begin.%d:\n", C);
+            if (Nd->Cond) {
+                genExpr(Nd->Cond);
+                printf("  beqz a0, .L.end.%d\n", C);
+            }  
+            genStmt(Nd->Then);
+            if (Nd->Inc) {
+                genExpr(Nd->Inc);  
+            }
+            printf("  j .L.begin.%d\n", C);
+            printf(".L.end.%d:\n", C);
+        
+            return;
+        }
+        case ND_BLOCK:
+            for (Node *N = Nd->Body; N; N=N->Next) {
+                genStmt(N);
+            }
+            return;
         case ND_RETURN:
             genExpr(Nd->LHS);
             printf("  j .L.return\n");
@@ -152,12 +195,8 @@ void codegen(Function* Prog) {
     printf("  mv fp, sp\n");
 
     printf("  addi sp, sp, -%d\n", Prog->StackSize);
-    // 遍历AST树生成汇编
-    for (Node *N = Prog->Body; N; N=N->Next) {
-        genStmt(N);
-         // 如果栈未清空，则报错
-        assert(Depth == 0);
-    }
+    genStmt(Prog->Body);
+    assert(Depth == 0);
 
     printf(".L.return:\n");
     printf("  mv sp, fp\n");
