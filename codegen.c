@@ -2,6 +2,8 @@
 
 static int Depth;
 
+static void genExpr(Node *Nd);
+
 static int count(void) {
     static int I = 1;
     return I++;
@@ -17,6 +19,7 @@ static void push(void)
 
 static void pop(char *Reg)
 {
+    printf("  # 弹栈, 将栈顶的值存入%s\n", Reg);
     printf("  ld %s, 0(sp)\n", Reg);
     printf("  addi sp, sp, 8\n");
     Depth--;
@@ -27,12 +30,20 @@ static int alignTo(int N, int Allign) {
 }
 
 static void genAddr(Node *Nd) {
-    if (Nd->Kind == ND_VAR) {
-        printf("  addi a0, fp, %d\n", Nd->Name->offset);
+    switch(Nd->Kind) {
+    case ND_VAR:
+        printf("  # 获取变量%s的栈内存地址为%d(fp)\n", Nd->Var->Name, Nd->Var->offset);
+        printf("  addi a0, fp, %d\n", Nd->Var->offset);
         return;
+    // 解引用*
+    case ND_DEREF:
+        genExpr(Nd->LHS);
+        return;
+    default:
+        break;
     }
 
-    error("not an lvalue");
+    errorTok(Nd->Tok, "not an lvalue");
 }
 
 static void genExpr(Node *Nd)
@@ -46,14 +57,28 @@ static void genExpr(Node *Nd)
         printf("  neg a0, a0\n");
         return;
      case ND_VAR:
+        // 计算出变量的地址，然后存入a0
         genAddr(Nd);
+        // 访问a0地址中存储的数据，存入到a0当中
+        printf("  # 读取a0中存放的地址,得到的值存放到a0中\n");
+        printf("  ld a0, 0(a0)\n");
+        return;
+    case ND_ADDR:
+        genAddr(Nd->LHS);
+        return;
+    case ND_DEREF:
+        genExpr(Nd->LHS);
+        printf("  # 读取a0中存放的地址,得到的值存放到a0中\n");
         printf("  ld a0, 0(a0)\n");
         return;
     case ND_ASSIGN:
+        // 左部是左值，保存值的地址
         genAddr(Nd->LHS);
         push();
+        // 右部是右值，为表达式的值
         genExpr(Nd->RHS);
         pop("a1");
+        printf("  # 将a0的值,写入到a1中存放的地址\n");
         printf("  sd a0, 0(a1)\n");
         return;
     default:
@@ -106,7 +131,7 @@ static void genExpr(Node *Nd)
         break;
     }
 
-    error("invalid expression");
+    errorTok(Nd->Tok, "invalid expression");
 }
 
 static void genStmt(Node *Nd) {
@@ -160,7 +185,7 @@ static void genStmt(Node *Nd) {
             break;
     }
 
-    error("Invalid statement");
+    errorTok(Nd->Tok, "Invalid statement");
 }
 
 static void assignLVarOffsets(Function* proc) {

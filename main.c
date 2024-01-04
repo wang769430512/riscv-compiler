@@ -14,6 +14,6 @@ int main(int argc, char **argv)
     Function *prog = parse(Tok);
     
     codegen(prog);
-
+    
     return 0;
 }

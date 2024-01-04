@@ -53,6 +53,8 @@ typedef enum
     ND_LE, // <=
     ND_GT, // >
     ND_GE, // >=
+    ND_ADDR,   // 取地址 &
+    ND_DEREF,  // 解引用 *
     ND_RETURN, // return
     ND_ASSIGN, // 赋值
     ND_IF,
@@ -72,6 +74,9 @@ struct Obj {
 struct Node
 {
     NodeKind Kind; // node kind
+    Node *Next;    // 指向下一个语句  
+    Token *Tok;
+    
     Node *LHS;     // left-hand side
     Node *RHS;     // right-hand side
 
@@ -85,8 +90,7 @@ struct Node
     // 代码块
     Node *Body;
     
-    Node *Next;    // 指向下一个语句  
-    Obj *Name;     // 存储ND_VAR的字符串
+    Obj *Var;     // 存储ND_VAR的字符串
     int Val;
 };
 
