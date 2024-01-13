@@ -97,6 +97,7 @@ static void genExpr(Node *Nd)
     switch (Nd->Kind)
     {
     case ND_ADD: // + a0 = a0 + a1;
+        printf("  # a0+a1, 结果写入a0\n");
         printf("  add a0, a0, a1\n");
         return;
     case ND_SUB: // - a0 = a0 - a1;
@@ -175,6 +176,7 @@ static void genStmt(Node *Nd) {
             }
             return;
         case ND_RETURN:
+            printf("# 返回语句\n");
             genExpr(Nd->LHS);
             printf("  j .L.return\n");
             return;

@@ -27,6 +27,61 @@ static Node *newBinary(NodeKind Kind, Node *LHS, Node *RHS, Token *Tok)
     return Nd;
 }
 
+static Node *newAdd(Node *LHS, Node *RHS, Token *Tok) {
+    addType(LHS);
+    addType(RHS);
+
+    if (isInteger(LHS->Ty) && isInteger(RHS->Ty)) {
+        return newBinary(ND_ADD, LHS, RHS, Tok);
+    }
+
+    if (LHS->Ty->Base && RHS->Ty->Base) {
+        errorTok(Tok, "invalid operands");
+    }
+
+    // num + ptr -> ptr + num
+    if (!LHS->Ty->Base && RHS->Ty->Base) {
+        Node *Tmp = LHS;
+        LHS = RHS;
+        RHS = Tmp;
+    }
+
+    // ptr + num ptr+1这里的1是一个元素
+    RHS = newBinary(ND_MUL, RHS, newNum(8, Tok), Tok);
+
+    return newBinary(ND_ADD, LHS, RHS, Tok);
+}
+
+static Node *newSub(Node *LHS, Node *RHS, Token *Tok) {
+    addType(LHS);
+    addType(RHS);
+
+    // num - num
+    if (isInteger(LHS->Ty) && isInteger(RHS->Ty)) {
+        return newBinary(ND_SUB, LHS, RHS, Tok);
+    }
+
+    // ptr - num
+    if (LHS->Ty->Base && isInteger(RHS->Ty)) {
+        RHS = newBinary(ND_MUL, RHS, newNum(8, Tok), Tok);
+        addType(RHS);
+        Node *Nd = newBinary(ND_SUB, LHS, RHS, Tok);
+        Nd->Ty = LHS->Ty;
+        return Nd;
+    }
+    
+    // ptr - ptr 
+    if (LHS->Ty->Base && RHS->Ty->Base) {
+        Node *Nd = newBinary(ND_SUB, LHS, RHS, Tok);
+        Nd->Ty = TyInt;
+        return newBinary(ND_DIV, Nd, newNum(8, Tok), Tok);
+    }
+
+    // num - ptr is wrong
+    errorTok(Tok, "invalid operands");
+    return NULL;
+}
+
 // create a new unary tree
 static Node *newUnary(NodeKind Kind, Node *child, Token *Tok)
 {
@@ -36,9 +91,12 @@ static Node *newUnary(NodeKind Kind, Node *child, Token *Tok)
     return Nd;
 }
 
-static Obj *newLVar(char *Name) {
+static Obj *newLVar(char *Name, Type *Ty) {
     Obj *Var = calloc(1, sizeof(Obj));
     Var->Name = Name;
+    Var->Next = Locals;
+    Var->Ty = Ty;
+    // 将变量插入头部
     Var->Next = Locals;
     Locals = Var;
     
@@ -78,8 +136,9 @@ static Obj *findVar(Token *Tok) {
 // mul = unary ("*" unary | "/" unary)*
 // unary = ("+" | "-" | "*" | "/" | "*" | "&") unary | primary
 // primary = "("expr")" | ident | num
-static Node *program(Token **Rest, Token *Tok);
+//static Node *program(Token **Rest, Token *Tok);
 static Node *compondStmt(Token **Rest, Token *Tok);
+static Node *declaration(Token **Rest, Token *Tok);
 static Node *stmt(Token **Rest, Token *Tok);
 static Node *exprStmt(Token **Rest, Token *Tok);
 static Node *expr(Token **Rest, Token *Tok);
@@ -91,7 +150,7 @@ static Node *mul(Token **Rest, Token *Tok);
 static Node *unary(Token **Rest, Token *Tok);
 static Node *primary(Token **Rest, Token *Tok);
 
-// compondStmt = stmt* "}"
+// compondStmt = (declaration | stmt)* "}"
 static Node *compondStmt(Token **Rest, Token *Tok) {
     Node *Nd = newNode(ND_BLOCK, Tok);
 
@@ -99,13 +158,101 @@ static Node *compondStmt(Token **Rest, Token *Tok) {
     Node *Cur = &Head;
 
     while (!equal(Tok, "}")) {
-        Cur->Next = stmt(&Tok, Tok);       
+        
+        if (equal(Tok, "int")) {
+            Cur->Next = declaration(&Tok, Tok);
+        } else {
+            Cur->Next = stmt(&Tok, Tok);
+        }
         Cur = Cur->Next;
+        // 构造完AST之后，添加节点类型
+        addType(Cur);
     } 
 
     Nd->Body = Head.Next;
     *Rest = Tok->Next;
 
+    return Nd;
+}
+
+// 获取标识符
+static char *getIdent(Token *Tok) {
+    if (Tok->Kind != TK_IDENT) 
+        errorTok(Tok, "expected an identifier");
+
+    return strndup(Tok->Loc, Tok->Len);
+}
+
+// declspec = "int"
+// declarator specifier
+static Type *declspec(Token **Rest, Token *Tok) {
+    *Rest = skip(Tok, "int");
+    return TyInt;
+}
+
+// declarator = "*"* ident
+static Type* declarator(Token **Rest, Token* Tok, Type *Ty) {
+    // "*"*
+    // 构建所有的(多重)指针
+    while (consume(&Tok, Tok, "*")) {
+        Ty = pointerTo(Ty);
+    }
+
+    if (Tok->Kind != TK_IDENT) {
+        errorTok(Tok, "expected a variable name");
+    }
+
+    // ident
+    // 变量名
+    Ty->Name = Tok;
+    *Rest = Tok->Next;
+    return Ty;
+}
+
+// declaration =
+//     declspec (declarator ("=" expr)?("," declarator ("=" expr)?)*)? ";"
+static Node *declaration(Token **Rest, Token *Tok) {
+    // declspec
+    // 声明 基础类型
+    Type *Basety = declspec(&Tok, Tok);
+
+    Node Head = {};
+    Node *Cur = &Head;
+    // 对变量声明次数计数
+    int I = 0;
+
+    // (declarator ("=" expr()?("," declarator ("=" expr)?)*)?
+    while (!equal(Tok, ";")) {
+        // 第一个变量不必匹配 ";"
+        if (I++ > 0) {
+            Tok = skip(Tok, ",");
+        }
+
+        // declarator
+        // 声明获取到变量类型，包括变量名
+        Type *Ty = declarator(&Tok, Tok, Basety);
+        Obj *Var = newLVar(getIdent(Ty->Name), Ty);
+
+        // 如果不存在"="则为变量声明，不需要生成节点，已经存储在Locals中了
+        if (!equal(Tok, "=")) {
+            continue;
+        }
+
+        // 解析"="后面的Token
+        Node *LHS = newVarNode(Var, Ty->Name);
+        // 解析递归赋值语句
+        Node *RHS = assign(&Tok, Tok->Next);
+        Node *Node = newBinary(ND_ASSIGN, LHS, RHS, Tok);
+
+        // 存放在表达语句中
+        Cur->Next = newUnary(ND_EXPR_STMT, Node, Tok);
+        Cur = Cur->Next;
+    }
+
+    // 将所有表达式语句存放在代码块中
+    Node *Nd = newNode(ND_BLOCK, Tok);
+    Nd->Body = Head.Next;
+    *Rest = Tok->Next;
     return Nd;
 }
 
@@ -269,15 +416,16 @@ static Node *add(Token **Rest, Token *Tok)
 
     while (true)
     {
+        Token *Start = Tok;
         if (equal(Tok, "+"))
         {
-            Nd = newBinary(ND_ADD, Nd, mul(&Tok, Tok->Next), Tok);
+            Nd = newAdd(Nd, mul(&Tok, Tok->Next), Start);
             continue;
         }
 
         if (equal(Tok, "-"))
         {
-            Nd = newBinary(ND_SUB, Nd, mul(&Tok, Tok->Next), Tok);
+            Nd = newSub(Nd, mul(&Tok, Tok->Next), Tok);
             continue;
         }
 
@@ -355,7 +503,7 @@ static Node *primary(Token **Rest, Token *Tok)
     if (Tok->Kind == TK_IDENT) {
         Obj *Var =findVar(Tok);
         if (!Var) {
-            Var =newLVar(strndup(Tok->Loc, Tok->Len));
+           errorTok(Tok, "undefined variable");
         }
         
         *Rest = Tok->Next;

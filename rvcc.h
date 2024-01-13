@@ -17,6 +17,7 @@ typedef enum
     TK_EOF,
 } TokenKind;
 
+typedef struct Type Type;
 typedef struct Node Node;
 
 typedef struct Token Token;
@@ -37,7 +38,7 @@ void errorTok(Token *Tok, char *Fmt, ...);
 
 bool equal(Token *Tok, char *Str);
 Token *skip(Token *Tok, char *Str);
-
+bool consume(Token **Rest, Token *Tok, char *Str);
 // AST的节点类型
 typedef enum
 {
@@ -68,6 +69,7 @@ typedef struct Obj Obj;
 struct Obj {
     Obj *Next;
     char *Name;
+    Type *Ty;   // 变量类型
     int offset;
 };
 
@@ -76,6 +78,7 @@ struct Node
     NodeKind Kind; // node kind
     Node *Next;    // 指向下一个语句  
     Token *Tok;
+    Type *Ty;      // 节点中数据的类型
     
     Node *LHS;     // left-hand side
     Node *RHS;     // right-hand side
@@ -103,4 +106,28 @@ struct Function {
 };
 
 Function *parse(Token *Tok);
+
+// 类型种类
+typedef enum {
+    TY_INT, // int整形
+    TY_PTR, // 指针
+} TypeKind;
+
+struct Type {
+    TypeKind Kind; // 种类
+
+    // 指针
+    Type *Base; // 指向的类型
+
+    // 声明
+    Token *Name;    
+};
+
+extern Type *TyInt;
+
+bool isInteger(Type *TY);
+void addType(Node *Nd);
+
+// 构建一个指针类型，并指向基类
+Type *pointerTo(Type *Base);
 void codegen(Function *Prog);

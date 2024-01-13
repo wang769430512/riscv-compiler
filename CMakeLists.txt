@@ -7,6 +7,7 @@ add_executable(rvcc
   tokenize.c
   parse.c
   codegen.c
+  type.c
 )
 
 SET( CMAKE_C_FLAGS "-std=c11 -g -fno-common" )

@@ -55,6 +55,20 @@ Token *skip(Token *Tok, char *Str)
     return Tok->Next;
 }
 
+// 消耗掉指定Token
+bool consume(Token **Rest, Token *Tok, char *Str) 
+{
+    // exist
+    if (equal(Tok, Str)) {
+        *Rest = Tok->Next;
+        return true;
+    }
+
+    // no exist
+    *Rest = Tok;
+    return false;
+}
+
 static int getNumber(Token *Tok)
 {
     if (Tok->Kind != TK_NUM)
@@ -96,7 +110,7 @@ static int readPunct(char *Ptr) {
 } 
 
 static bool isKeyword(Token *Tok) {
-    static char* KW[] = {"return", "if", "else", "for", "while"};
+    static char* KW[] = {"return", "if", "else", "for", "while", "int"};
     
     for (int I=0; I < sizeof(KW)/sizeof(*KW); I++) {
         if (equal(Tok, KW[I])) {
