@@ -61,6 +61,7 @@ typedef enum
     ND_IF,
     ND_FOR, // "for" or "while"
     ND_BLOCK,  // { ... }, 代码块
+    ND_FUNCALL,  //函数调用
     ND_EXPR_STMT, // 表达式语句
     ND_VAR, // 变量
 } NodeKind;
@@ -70,7 +71,7 @@ struct Obj {
     Obj *Next;
     char *Name;
     Type *Ty;   // 变量类型
-    int offset;
+    int Offset;
 };
 
 struct Node
@@ -92,6 +93,10 @@ struct Node
 
     // 代码块
     Node *Body;
+
+    // 函数调用
+    char *FuncName; // 函数名
+    Node *Args;     // 函数参数
     
     Obj *Var;     // 存储ND_VAR的字符串
     int Val;
@@ -100,17 +105,20 @@ struct Node
 // function
 typedef struct Function Function;
 struct Function {
-    Node *Body;
-    Obj *Locals;
-    int StackSize;
+    Function *Next; // 下一个函数
+    char *Name;     // 函数名
+    Node *Body;     // 函数体
+    Obj *Locals;    // 本地变量
+    int StackSize;  // 栈大小
 };
 
 Function *parse(Token *Tok);
 
 // 类型种类
 typedef enum {
-    TY_INT, // int整形
-    TY_PTR, // 指针
+    TY_INT,  // int整形
+    TY_PTR,  // 指针
+    TY_FUNC, // 函数
 } TypeKind;
 
 struct Type {
@@ -121,12 +129,18 @@ struct Type {
 
     // 声明
     Token *Name;    
+
+    // 函数类型
+    Type *ReturnTy; // 函数返回类型
 };
 
 extern Type *TyInt;
 
 bool isInteger(Type *TY);
+// 为节点内的所有节点添加类型
 void addType(Node *Nd);
+// 函数类型
+Type *funcType(Type *ReturnTy);
 
 // 构建一个指针类型，并指向基类
 Type *pointerTo(Type *Base);

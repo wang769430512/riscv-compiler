@@ -119,8 +119,17 @@ static Obj *findVar(Token *Tok) {
     return NULL;
 }
 
-// program = "{" compoundStmt
-// compondStmt = stmt* "}"
+// program = functionDefinition*
+// functionDefinition = declspec declarator "{" compoundStmt*
+// declspec = "int"
+// declarator = "*"* ident typeSuffix
+// typeSuffix = ("(" funcParams? ")")?
+// funcParams = param (, "param")*
+// param = declspec declarator
+
+// compondStmt = (declaration | stmt)* "}"
+// declaration =
+//    declspec (declarator ("=" expr)? ("," declarator ("=" expr)?)*)? ";"
 // stmt =  ""return" expr ";"
 //        | "if" "(" expr ")" stmt ("else" stmt)? 
 //        | "for" "(" exprStmt expr?";" expr? ";" expr? ";")" stmt
@@ -135,7 +144,10 @@ static Obj *findVar(Token *Tok) {
 // add = mul("+"mul | "-"mul)*
 // mul = unary ("*" unary | "/" unary)*
 // unary = ("+" | "-" | "*" | "/" | "*" | "&") unary | primary
-// primary = "("expr")" | ident | num
+// primary = "("expr")" | ident func-args? | num
+
+// funcall = ident "(" (assign ("," assign)*)? ")"
+// // args = "(" ")"
 //static Node *program(Token **Rest, Token *Tok);
 static Node *compondStmt(Token **Rest, Token *Tok);
 static Node *declaration(Token **Rest, Token *Tok);
@@ -149,16 +161,17 @@ static Node *add(Token **Rest, Token *Tok);
 static Node *mul(Token **Rest, Token *Tok);
 static Node *unary(Token **Rest, Token *Tok);
 static Node *primary(Token **Rest, Token *Tok);
+static Node *funCall(Token **Rest, Token *Tok);
 
 // compondStmt = (declaration | stmt)* "}"
 static Node *compondStmt(Token **Rest, Token *Tok) {
     Node *Nd = newNode(ND_BLOCK, Tok);
-
+    
+    // 这里使用了和词法分析类似的单向链表结构
     Node Head = {};
     Node *Cur = &Head;
 
-    while (!equal(Tok, "}")) {
-        
+    while (!equal(Tok, "}")) {     
         if (equal(Tok, "int")) {
             Cur->Next = declaration(&Tok, Tok);
         } else {
@@ -190,7 +203,18 @@ static Type *declspec(Token **Rest, Token *Tok) {
     return TyInt;
 }
 
-// declarator = "*"* ident
+// typeSuffix = ("(" ")")?
+static Type *typeSuffix(Token **Rest, Token *Tok, Type *Ty) {
+    // ("(" ")")?
+    if (equal(Tok, "(")) {
+        *Rest = skip(Tok->Next, ")");
+        return funcType(Ty);
+    }
+    *Rest = Tok;
+    return Ty;
+}
+
+// declarator = "*"* ident typeSuffix
 static Type* declarator(Token **Rest, Token* Tok, Type *Ty) {
     // "*"*
     // 构建所有的(多重)指针
@@ -202,10 +226,12 @@ static Type* declarator(Token **Rest, Token* Tok, Type *Ty) {
         errorTok(Tok, "expected a variable name");
     }
 
+    // typeSuffix
+    Ty = typeSuffix(Rest, Tok->Next, Ty);
     // ident
-    // 变量名
+    // 变量名 或 函数名
     Ty->Name = Tok;
-    *Rest = Tok->Next;
+
     return Ty;
 }
 
@@ -254,6 +280,27 @@ static Node *declaration(Token **Rest, Token *Tok) {
     Nd->Body = Head.Next;
     *Rest = Tok->Next;
     return Nd;
+}
+
+// functionDefinition = declspec declarator? ident "(" ")" "{" compoundStmt*
+static Function *function(Token **Rest, Token *Tok) {
+    // declspec
+    Type *Ty = declspec(&Tok, Tok);
+    // declarator? ident "(" ")"
+    Ty = declarator(&Tok, Tok, Ty);
+
+    // 清空全局变量 Locals
+    Locals = NULL;
+
+    // 从解析完成的Ty中读取ident
+    Function *Fn = calloc(1, sizeof(Function));
+    Fn->Name = getIdent(Ty->Name);
+
+    Tok = skip(Tok, "{");
+    // 函数体存储语句的AST, Locals存储变量
+    Fn->Body = compondStmt(Rest, Tok);
+    Fn->Locals = Locals;
+    return Fn;
 }
 
 // stmt = "return" expr ";"
@@ -490,7 +537,7 @@ static Node *unary(Token **Rest, Token *Tok)
     return primary(Rest, Tok);
 }
 
-// primary = "("expr")" | ident | num
+// primary = "("expr")" | ident args? | num
 static Node *primary(Token **Rest, Token *Tok)
 {
     if (equal(Tok, "("))
@@ -500,7 +547,14 @@ static Node *primary(Token **Rest, Token *Tok)
         return Nd;
     }
 
+    // ident args?
     if (Tok->Kind == TK_IDENT) {
+        if (equal(Tok->Next, "(")) { 
+            return funCall(Rest, Tok);
+        }
+
+        // ident
+        // 查找变量
         Obj *Var =findVar(Tok);
         if (!Var) {
            errorTok(Tok, "undefined variable");
@@ -521,14 +575,40 @@ static Node *primary(Token **Rest, Token *Tok)
     return NULL;
 }
 
-// program = "{" CompondStmt
+// funcall = ident "(" (assign ("," assign)*)? ")"
+static Node *funCall(Token **Rest, Token *Tok) {
+    Token *Start = Tok;
+    Tok = Tok->Next->Next;
+
+    Node Head = {};
+    Node *Cur = &Head;
+
+    while (!equal(Tok, ")")) {
+        if (Cur != &Head) {
+            Tok = skip(Tok, ",");
+        }
+        // assign
+        Cur->Next = assign(&Tok, Tok);
+        Cur = Cur->Next;
+    }
+
+    *Rest = skip(Tok, ")");
+
+    Node *Nd = newNode(ND_FUNCALL, Start);
+    // ident
+    Nd->FuncName = strndup(Start->Loc, Start->Len);
+    Nd->Args = Head.Next;
+    return Nd;
+}
+
+// program = functionDefinition*
 Function *parse(Token *Tok) {
+     Function Head = {};
+     Function *Cur = &Head;
 
-    Tok = skip(Tok, "{");
+     while (Tok->Kind != TK_EOF) {
+        Cur = Cur->Next = function(&Tok, Tok);
+     }
 
-    Function *prog = calloc(1, sizeof(Function));;
-    prog->Body = compondStmt(&Tok, Tok);
-    prog->Locals = Locals;
-
-    return prog;
+     return Head.Next;
 }

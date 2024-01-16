@@ -18,6 +18,14 @@ Type *pointerTo(Type *Base) {
     return Ty;
 }
 
+// 函数类型，并赋返回类型
+Type *funcType(Type *ReturnTy) {
+    Type *Ty = calloc(1, sizeof(Type));
+    Ty->Kind = TY_FUNC;
+    Ty->ReturnTy = ReturnTy;
+    return Ty;
+}
+
 // 为节点增加类型
 void addType(Node *Nd) {
     if (!Nd || Nd->Ty) {
@@ -54,6 +62,7 @@ void addType(Node *Nd) {
     case ND_LT:
     case ND_LE:
     case ND_NUM:
+    case ND_FUNCALL:
         Nd->Ty = TyInt;
         return;
     // 将节点类型设为 变量的类型
