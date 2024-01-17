@@ -149,6 +149,7 @@ static Obj *findVar(Token *Tok) {
 // funcall = ident "(" (assign ("," assign)*)? ")"
 // // args = "(" ")"
 //static Node *program(Token **Rest, Token *Tok);
+static Type *declarator(Token **Rest, Token *Tok, Type *Ty);
 static Node *compondStmt(Token **Rest, Token *Tok);
 static Node *declaration(Token **Rest, Token *Tok);
 static Node *stmt(Token **Rest, Token *Tok);
@@ -207,8 +208,31 @@ static Type *declspec(Token **Rest, Token *Tok) {
 static Type *typeSuffix(Token **Rest, Token *Tok, Type *Ty) {
     // ("(" ")")?
     if (equal(Tok, "(")) {
-        *Rest = skip(Tok->Next, ")");
-        return funcType(Ty);
+        Tok = Tok->Next;
+
+        // 存储形参的链表
+        Type Head = {};
+        Type *Cur = &Head;
+
+        while (!equal(Tok, ")")) {
+            // funcParams = param ("," param)*
+            // param = declspec declarator
+            if (Cur != &Head) {
+                Tok = skip(Tok, ",");
+            }
+            Type *BaseTy = declspec(&Tok, Tok);
+            Type *DeclarTy = declarator(&Tok, Tok, BaseTy);
+            // 将类型复制到形参链表一份
+            Cur->Next = copyType(DeclarTy);
+            Cur = Cur->Next;
+        }
+
+        // 封装一个函数节点
+        Ty = funcType(Ty);
+        // 传递形参
+        Ty->Params = Head.Next;
+        *Rest = Tok->Next;
+        return Ty;
     }
     *Rest = Tok;
     return Ty;
@@ -282,6 +306,17 @@ static Node *declaration(Token **Rest, Token *Tok) {
     return Nd;
 }
 
+// 将形参添加到Locals
+static void createParamLVars(Type *Param) {
+    if (Param) {
+        // 递归到形参最底部
+        // 先将最底部的加入Locals中，之后的都逐个加入到顶部，保持顺序不变
+        createParamLVars(Param->Next);
+        // 添加到Locals
+        newLVar(getIdent(Param->Name), Param);
+    }
+}
+
 // functionDefinition = declspec declarator? ident "(" ")" "{" compoundStmt*
 static Function *function(Token **Rest, Token *Tok) {
     // declspec
@@ -294,7 +329,12 @@ static Function *function(Token **Rest, Token *Tok) {
 
     // 从解析完成的Ty中读取ident
     Function *Fn = calloc(1, sizeof(Function));
+    // 函数名
     Fn->Name = getIdent(Ty->Name);
+
+    // 函数参数
+    createParamLVars(Ty->Params);
+    Fn->Params = Locals;
 
     Tok = skip(Tok, "{");
     // 函数体存储语句的AST, Locals存储变量

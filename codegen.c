@@ -170,12 +170,13 @@ static void genStmt(Node *Nd) {
             genExpr(Nd->Cond);
             printf("  beqz a0, .L.else.%d\n", C);
             genStmt(Nd->Then);
+            // 执行完后跳转到if语句后面的语句
             printf("  j .L.end.%d\n", C);
             printf(".L.else.%d:\n", C);
             if (Nd->Els) {
-                genStmt(Nd->Els);
-                printf(".L.end.%d:\n", C);
+                genStmt(Nd->Els);                
             }
+            printf(".L.end.%d:\n", C);
             return;
         }
         case ND_FOR: {
@@ -276,6 +277,12 @@ void codegen(Function* Prog) {
         // 偏移量为实际变量所用的栈大小
         printf("  # sp腾出StackSize大小的栈空间\n");
         printf("  addi sp, sp, -%d\n", Fn->StackSize);
+
+        int I = 0;
+        for (Obj *Var = Fn->Params; Var; Var = Var->Next) {
+            printf("  # 将%s寄存器的值存入%s的栈地址\n", ArgReg[I], Var->Name);
+            printf("  sd %s, %d(fp)\n", ArgReg[I++], Var->Offset);
+        }
 
         // 生成语句链表的代码
         printf("\n# ===== %s段主体 ============\n", Fn->Name);
