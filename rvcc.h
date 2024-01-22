@@ -118,19 +118,24 @@ Function *parse(Token *Tok);
 
 // 类型种类
 typedef enum {
-    TY_INT,  // int整形
-    TY_PTR,  // 指针
-    TY_FUNC, // 函数
+    TY_INT,   // int整形
+    TY_PTR,   // 指针
+    TY_FUNC,  // 函数
+    TY_ARRAY, // 数组
 } TypeKind;
 
 struct Type {
     TypeKind Kind; // 种类
+    int Size;      // 大小，sizeof返回的值
 
     // 指针
     Type *Base; // 指向的类型
 
-    // 声明
+    // 类型对应名称，如:变量名、函数名
     Token *Name;    
+
+    // 数组
+    int ArrayLen; // 数组长度，元素总个数
 
     // 函数类型
     Type *ReturnTy; // 函数返回类型
@@ -145,6 +150,8 @@ bool isInteger(Type *Ty);
 Type *copyType(Type *Ty);
 // 为节点内的所有节点添加类型
 void addType(Node *Nd);
+// 数组类型
+Type *arrayOf(Type *Base, int Size);
 // 函数类型
 Type *funcType(Type *ReturnTy);
 
