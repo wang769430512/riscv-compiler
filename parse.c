@@ -124,7 +124,7 @@ static Obj *findVar(Token *Tok) {
 // functionDefinition = declspec declarator "{" compoundStmt*
 // declspec = "int"
 // declarator = "*"* ident typeSuffix
-// typeSuffix = ("(" funcParams | "[" sum "]" | ε
+// typeSuffix = ("(" funcParams | "[" num "]" typeSuffix | ε
 // funcParams = (param ("," "param")*)? ")"
 // param = declspec declarator
 
@@ -240,7 +240,7 @@ static Type *funcParams(Token **Rest, Token *Tok, Type *Ty) {
     return Ty;
 }
 
-// typeSuffix = ("(" ")")?
+// typeSuffix = ("funcParams | "["nums"]"" typeSuffix | ε
 static Type *typeSuffix(Token **Rest, Token *Tok, Type *Ty) {
     // ("(" ")")?
     if (equal(Tok, "(")) {
@@ -249,7 +249,8 @@ static Type *typeSuffix(Token **Rest, Token *Tok, Type *Ty) {
 
     if (equal(Tok, "[")) {
         int Sz = getNumber(Tok->Next);
-        *Rest = skip(Tok->Next->Next, "]");
+        Tok = skip(Tok->Next->Next, "]");
+        Ty = typeSuffix(Rest, Tok, Ty);
         return arrayOf(Ty, Sz);
     }
 
