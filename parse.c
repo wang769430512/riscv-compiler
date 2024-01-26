@@ -145,6 +145,7 @@ static Obj *findVar(Token *Tok) {
 // add = mul("+"mul | "-"mul)*
 // mul = unary ("*" unary | "/" unary)*
 // unary = ("+" | "-" | "*" | "/" | "*" | "&") unary | primary
+// postfix = primary ("[" expr "]")*
 // primary = "("expr")" | ident func-args? | num
 
 // funcall = ident "(" (assign ("," assign)*)? ")"
@@ -162,6 +163,7 @@ static Node *relational(Token **Rest, Token *Tok);
 static Node *add(Token **Rest, Token *Tok);
 static Node *mul(Token **Rest, Token *Tok);
 static Node *unary(Token **Rest, Token *Tok);
+static Node *postfix(Token **Rest, Token *Tok);
 static Node *primary(Token **Rest, Token *Tok);
 static Node *funCall(Token **Rest, Token *Tok);
 
@@ -570,7 +572,8 @@ static Node *mul(Token **Rest, Token *Tok)
     }
 }
 
-// unary = unary("+" | "-" | "*" | "&")unary | primary
+// 解析一元运算
+// unary = unary("+" | "-" | "*" | "&")unary | postfix
 static Node *unary(Token **Rest, Token *Tok)
 {
     // "+"" unary
@@ -594,7 +597,24 @@ static Node *unary(Token **Rest, Token *Tok)
     }
 
     // primary
-    return primary(Rest, Tok);
+    return postfix(Rest, Tok);
+}
+
+// postfix = primary ("[" expr "]")*
+static Node *postfix(Token **Rest, Token *Tok) {
+    // primary
+    Node *Nd = primary(&Tok, Tok);
+
+    // ("[" expr "]")
+    while (equal(Tok, "[")) {
+        // x[y] 等价于 *(x+y)
+        Token *Start = Tok;
+        Node *Idx = expr(&Tok, Tok->Next);
+        Tok = skip(Tok, "]");
+        Nd = newUnary(ND_DEREF, newAdd(Nd, Idx, Start), Start);
+    }
+    *Rest = Tok;
+    return Nd;
 }
 
 // primary = "("expr")" | ident args? | num
