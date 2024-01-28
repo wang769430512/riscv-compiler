@@ -146,7 +146,7 @@ static Obj *findVar(Token *Tok) {
 // mul = unary ("*" unary | "/" unary)*
 // unary = ("+" | "-" | "*" | "/" | "*" | "&") unary | primary
 // postfix = primary ("[" expr "]")*
-// primary = "("expr")" | ident func-args? | num
+// primary = "(" expr ")" | "sizeof" unary | ident func-args? | num
 
 // funcall = ident "(" (assign ("," assign)*)? ")"
 // // args = "(" ")"
@@ -607,11 +607,11 @@ static Node *postfix(Token **Rest, Token *Tok) {
 
     // ("[" expr "]")
     while (equal(Tok, "[")) {
-        // x[y] 等价于 *(x+y)
+        // x[y] 等价于*(x+y)
         Token *Start = Tok;
         Node *Idx = expr(&Tok, Tok->Next);
         Tok = skip(Tok, "]");
-        Nd = newUnary(ND_DEREF, newAdd(Nd, Idx, Start), Start);
+        Nd = newUnary(ND_DEREF, newAdd(Nd, Idx, Tok), Start);
     }
     *Rest = Tok;
     return Nd;
@@ -625,6 +625,13 @@ static Node *primary(Token **Rest, Token *Tok)
         Node *Nd = expr(&Tok, Tok->Next);
         *Rest = skip(Tok, ")");
         return Nd;
+    }
+
+    // "sizeof" unary
+    if (equal(Tok, "sizeof")) {
+        Node *Nd = expr(Rest, Tok->Next);
+        addType(Nd);
+        return newNum(Nd->Ty->Size, Tok);
     }
 
     // ident args?

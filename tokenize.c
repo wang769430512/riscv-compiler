@@ -110,7 +110,7 @@ static int readPunct(char *Ptr) {
 } 
 
 static bool isKeyword(Token *Tok) {
-    static char* KW[] = {"return", "if", "else", "for", "while", "int"};
+    static char* KW[] = {"return", "if", "else", "for", "while", "int", "sizeof"};
     
     for (int I=0; I < sizeof(KW)/sizeof(*KW); I++) {
         if (equal(Tok, KW[I])) {
