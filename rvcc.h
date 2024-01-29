@@ -68,10 +68,23 @@ typedef enum
 
 typedef struct Obj Obj;
 struct Obj {
-    Obj *Next;
-    char *Name;
-    Type *Ty;   // 变量类型
-    int Offset;
+    Obj *Next;    // 指向下一对象
+    char *Name;   // 变量名
+    Type *Ty;     // 变量类型
+    bool isLocal; // 是局部或全局变量
+    
+    // 局部变量
+    int Offset;  // fp的偏移量
+
+    // 函数 或 全局变量
+    bool isFunction;
+
+    // 函数
+    Obj *Params;   // 形参
+
+    Node *Body;    // 函数体
+    Obj *Locals;   // 本地变量
+    int StackSize; // 栈大小
 };
 
 struct Node
@@ -102,19 +115,7 @@ struct Node
     int Val;
 };
 
-// function
-typedef struct Function Function;
-struct Function {
-    Function *Next; // 下一个函数
-    char *Name;     // 函数名
-    Obj *Params;    // 形参
-
-    Node *Body;     // 函数体
-    Obj *Locals;    // 本地变量
-    int StackSize;  // 栈大小
-};
-
-Function *parse(Token *Tok);
+Obj *parse(Token *Tok);
 
 // 类型种类
 typedef enum {
@@ -157,4 +158,4 @@ Type *funcType(Type *ReturnTy);
 
 // 构建一个指针类型，并指向基类
 Type *pointerTo(Type *Base);
-void codegen(Function *Prog);
+void codegen(Obj *Prog);

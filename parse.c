@@ -1,6 +1,8 @@
 #include "rvcc.h"
 
-Obj* Locals;
+// 在解析时，全部的变量实例都被累加到这个列表里
+Obj* Locals;  // 局部变量
+Obj* Globals; // 全局变量
 
 static Node *newNode(NodeKind Kind, Token *Tok)
 {
@@ -92,15 +94,31 @@ static Node *newUnary(NodeKind Kind, Node *child, Token *Tok)
     return Nd;
 }
 
-static Obj *newLVar(char *Name, Type *Ty) {
+// 新建变量
+static Obj *newVar(char *Name, Type *Ty) {
     Obj *Var = calloc(1, sizeof(Obj));
     Var->Name = Name;
-    Var->Next = Locals;
     Var->Ty = Ty;
+
+    return Var;
+}
+
+static Obj *newLVar(char *Name, Type *Ty) {
+    Obj *Var = newVar(Name, Ty);
+    Var->isLocal = true;
+    Var->Next = Locals;
     // 将变量插入头部
     Var->Next = Locals;
     Locals = Var;
     
+    return Var;
+}
+
+// 在链表中新增一个全局变量
+static Obj *newGVar(char *Name, Type *Ty) {
+    Obj *Var = newVar(Name, Ty);
+    Var->Next = Globals;
+    Globals = Var;
     return Var;
 }
 
@@ -340,19 +358,15 @@ static void createParamLVars(Type *Param) {
 }
 
 // functionDefinition = declspec declarator? ident "(" ")" "{" compoundStmt*
-static Function *function(Token **Rest, Token *Tok) {
-    // declspec
-    Type *Ty = declspec(&Tok, Tok);
+static Token *function(Token *Tok, Type *BaseTy) {
     // declarator? ident "(" ")"
-    Ty = declarator(&Tok, Tok, Ty);
+    Type *Ty = declarator(&Tok, Tok, BaseTy);
+
+    Obj *Fn = newGVar(getIdent(Ty->Name), Ty);
+    Fn->isFunction = true;
 
     // 清空全局变量 Locals
     Locals = NULL;
-
-    // 从解析完成的Ty中读取ident
-    Function *Fn = calloc(1, sizeof(Function));
-    // 函数名
-    Fn->Name = getIdent(Ty->Name);
 
     // 函数参数
     createParamLVars(Ty->Params);
@@ -360,9 +374,9 @@ static Function *function(Token **Rest, Token *Tok) {
 
     Tok = skip(Tok, "{");
     // 函数体存储语句的AST, Locals存储变量
-    Fn->Body = compondStmt(Rest, Tok);
+    Fn->Body = compondStmt(&Tok, Tok);
     Fn->Locals = Locals;
-    return Fn;
+    return Tok;
 }
 
 // stmt = "return" expr ";"
@@ -688,14 +702,15 @@ static Node *funCall(Token **Rest, Token *Tok) {
     return Nd;
 }
 
-// program = functionDefinition*
-Function *parse(Token *Tok) {
-     Function Head = {};
-     Function *Cur = &Head;
+// 语法解析入口函数
+// program = (functionDefinition | global-variable)*
+Obj *parse(Token *Tok) {
+     Globals = NULL;
 
      while (Tok->Kind != TK_EOF) {
-        Cur = Cur->Next = function(&Tok, Tok);
+        Type *BaseTy = declspec(&Tok, Tok);
+        Tok = function(Tok, BaseTy);
      }
 
-     return Head.Next;
+     return Globals;
 }
