@@ -71,7 +71,7 @@ struct Obj {
     Obj *Next;    // 指向下一对象
     char *Name;   // 变量名
     Type *Ty;     // 变量类型
-    bool isLocal; // 是局部或全局变量
+    bool IsLocal; // 是局部或全局变量
     
     // 局部变量
     int Offset;  // fp的偏移量

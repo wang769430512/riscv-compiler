@@ -37,9 +37,18 @@ static int alignTo(int N, int Allign) {
 static void genAddr(Node *Nd) {
     switch(Nd->Kind) {
     case ND_VAR:
-        // 偏移量是相对于fp的
-        printf("  # 获取变量%s的栈内存地址为%d(fp)\n", Nd->Var->Name, Nd->Var->Offset);
-        printf("  addi a0, fp, %d\n", Nd->Var->Offset);
+        if (Nd->Var->IsLocal) { // 偏移量是相对于fp的
+            printf("  # 获取局部变量%s的栈内地址为%d(fp)\n", Nd->Var->Name, Nd->Var->Offset);
+            printf("  addi a0, fp, %d\n", Nd->Var->Offset);
+        } else {
+            printf("  # 获取全局变量%s的地址\n", Nd->Var->Name);
+            // 获取全局变量的地址
+            // 高地址(高20位， 31~20位)
+            printf("  lui a0, %%hi(%s)\n", Nd->Var->Name);
+            // 低地址(低12位, 19~0位)
+            printf("  addi a0, a0, %%lo(%s)\n", Nd->Var->Name);
+            // printf("  la a0, %s\n", Nd->Var->Name);
+        }
         return;
     // 解引用*
     case ND_DEREF:
@@ -256,10 +265,24 @@ static void assignLVarOffsets(Obj* Prog) {
     }
 }
 
-void codegen(Obj* Prog) {
-    assignLVarOffsets(Prog);
+static void emitData(Obj *Prog) {
+    for (Obj* Var=Prog; Var; Var=Var->Next) {
+        if (Var->isFunction) {
+            continue;
+        }
 
-    // 为每个函数单独生成代码
+        printf("  # 数据标签开始\n");
+        printf("  .data\n");
+        printf("  .global %s\n", Var->Name);
+        printf("  # 全局变量%s\n", Var->Name);
+        printf("%s:\n", Var->Name);
+        printf("  # 零位填充%d位\n", Var->Ty->Size);
+        printf("  .zero %d\n", Var->Ty->Size);
+    }
+}
+
+// 代码生成入口函数，包括代码块的基础信息
+void emitText(Obj *Prog) {
     for (Obj *Fn = Prog; Fn; Fn = Fn->Next) {
         if (!Fn->isFunction) {
             continue;
@@ -267,6 +290,7 @@ void codegen(Obj* Prog) {
         printf("\n  # 定义全局 %s\n", Fn->Name);
         printf("  .globl %s\n", Fn->Name);
 
+        printf("  # 代码段标签\n");
         printf("  .text\n");
         printf("# =====%s段开始===============\n", Fn->Name);
         printf("# %s段标签\n", Fn->Name);
@@ -329,5 +353,14 @@ void codegen(Obj* Prog) {
         // 返回
         printf("  # 返回a0值给系统调用\n");
         printf("  ret\n");
-    }  
+    }
+}
+
+void codegen(Obj *Prog) {
+    // 计算局部变量的偏移量
+    assignLVarOffsets(Prog);
+    // 生成数据
+    emitData(Prog);
+    // 生成代码
+    emitText(Prog);
 }
