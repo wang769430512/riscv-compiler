@@ -151,7 +151,7 @@ static Obj *findVar(Token *Tok) {
 
 // program = functionDefinition*
 // functionDefinition = declspec declarator "{" compoundStmt*
-// declspec = "int"
+// declspec = "int" | "char"
 // declarator = "*"* ident typeSuffix
 // typeSuffix = ("(" funcParams | "[" num "]" typeSuffix | ε
 // funcParams = (param ("," "param")*)? ")"
@@ -196,6 +196,10 @@ static Node *postfix(Token **Rest, Token *Tok);
 static Node *primary(Token **Rest, Token *Tok);
 static Node *funCall(Token **Rest, Token *Tok);
 
+static bool isTypeName(Token *Tok) {
+    return equal(Tok, "char") || equal(Tok, "int");
+}
+
 // compondStmt = (declaration | stmt)* "}"
 static Node *compondStmt(Token **Rest, Token *Tok) {
     Node *Nd = newNode(ND_BLOCK, Tok);
@@ -205,7 +209,7 @@ static Node *compondStmt(Token **Rest, Token *Tok) {
     Node *Cur = &Head;
 
     while (!equal(Tok, "}")) {     
-        if (equal(Tok, "int")) {
+        if (isTypeName(Tok)) {
             Cur->Next = declaration(&Tok, Tok);
         } else {
             Cur->Next = stmt(&Tok, Tok);
@@ -237,9 +241,15 @@ static int getNumber(Token *Tok) {
     return Tok->Val;
 }
 
-// declspec = "int"
+// declspec = "int" | "char"
 // declarator specifier
 static Type *declspec(Token **Rest, Token *Tok) {
+    if (equal(Tok, "char")) {
+        //*Rest = skip(Tok, "char");
+        *Rest = Tok->Next;
+        return TyChar;
+    }
+
     *Rest = skip(Tok, "int");
     return TyInt;
 }

@@ -119,6 +119,7 @@ Obj *parse(Token *Tok);
 
 // 类型种类
 typedef enum {
+    TY_CHAR,  // char类型
     TY_INT,   // int整形
     TY_PTR,   // 指针
     TY_FUNC,  // 函数
@@ -144,6 +145,8 @@ struct Type {
     Type *Next;     // 下一类型
 };
 
+// 声明全局变量，在type.c中定义全局变量
+extern Type *TyChar;
 extern Type *TyInt;
 
 bool isInteger(Type *Ty);
