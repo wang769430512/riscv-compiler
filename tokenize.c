@@ -125,6 +125,26 @@ static bool isKeyword(Token *Tok) {
     return false;
 }
 
+// 读取字符串字面量
+static Token *readStringLiteral(char *Start) {
+    char *P = Start + 1;
+    // 识别字符串内的所有非"字符
+    for (; *P != '"'; ++P) {
+        // 遇到换行符和'\0'则报错
+        if (*P == '\n' || *P == '\0') {
+            errorAt(Start, "unclosed string literal");
+        }
+    }
+
+    Token *Tok = newToken(TK_STR, Start, P + 1);
+    // 构建 char[] 类型
+    Tok->Ty = arrayOf(TyChar, P - Start);
+
+    // 拷贝双引号间的内容，结果是\0的char *类型
+    Tok->Str = strndup(Start + 1, P - Start - 1);
+    return Tok;
+}
+
 static void convertKeywords(Token *Tok) {
     for (Token *T = Tok; T->Kind != TK_EOF; T = T->Next) {
         if (isKeyword(T)) {
@@ -151,6 +171,14 @@ Token *tokenize(char *P) {
             const char *OldPtr = P;
             Cur->Val = strtoul(P, &P, 10);
             Cur->Len = P - OldPtr;
+            continue;
+        }
+
+        // 解析字符串字面量
+        if (*P == '"') {
+            Cur->Next = readStringLiteral(P);
+            Cur = Cur->Next;
+            P += Cur->Len;
             continue;
         }
 

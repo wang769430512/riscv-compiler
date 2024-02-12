@@ -8,26 +8,29 @@
 
 #define _POSIX_C_SOURCE 200809L
 
-typedef enum
-{
-    TK_IDENT, // 标记符，可以为变量名、函数名
-    TK_PUNCT,
-    TK_KEYWORD,
-    TK_NUM,
-    TK_EOF,
-} TokenKind;
-
 typedef struct Type Type;
 typedef struct Node Node;
+
+typedef enum
+{
+    TK_IDENT,   // 标记符，可以为变量名、函数名
+    TK_PUNCT,   // 操作符如: + -
+    TK_KEYWORD, // 关键字
+    TK_STR,     // 字符串字面量
+    TK_NUM,     // 数字 
+    TK_EOF,     // 文件终止符，即文件的最后
+} TokenKind;
 
 typedef struct Token Token;
 struct Token
 {
-    TokenKind Kind;
-    Token *Next;
-    int Val;
-    char *Loc;
-    int Len;
+    TokenKind Kind; // 种类
+    Token *Next;    // 指向下一个终结符
+    int Val;        // 值
+    char *Loc;      // 在解析的字符串内的位置
+    int Len;        // 长度
+    Type *Ty;       // TK_STR使用
+    char *Str;      // 字符串字面量，包括'\0'
 };
 Token *tokenize(char *Input);
 
@@ -78,6 +81,9 @@ struct Obj {
 
     // 函数 或 全局变量
     bool isFunction;
+
+    // 全局变量
+    char *InitData;
 
     // 函数
     Obj *Params;   // 形参
