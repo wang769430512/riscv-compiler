@@ -11,6 +11,13 @@
 typedef struct Type Type;
 typedef struct Node Node;
 
+//
+// 字符串
+//
+
+char *format(char *Fmt, ...);
+
+
 typedef enum
 {
     TK_IDENT,   // 标记符，可以为变量名、函数名
