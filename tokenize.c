@@ -125,23 +125,92 @@ static bool isKeyword(Token *Tok) {
     return false;
 }
 
-// 读取字符串字面量
-static Token *readStringLiteral(char *Start) {
-    char *P = Start + 1;
-    // 识别字符串内的所有非"字符
-    for (; *P != '"'; ++P) {
-        // 遇到换行符和'\0'则报错
+// 读取到字符串字面量结尾
+static char *stringLiteralEnd(char *P) {
+    char *Start = P;
+    for (; *P != '"'; P++) {  
         if (*P == '\n' || *P == '\0') {
             errorAt(Start, "unclosed string literal");
         }
+
+        if (*P == '\\') {
+            P++;
+        }
+    }
+    return P;
+}
+
+static int readEscapedChar(char *P) {
+    switch(*P) {
+    case 'a': // 响铃 (警报)
+        return '\a';
+    case 'b': // 退格
+        return '\b';
+    case 't': // 水平指标符
+        return '\t';
+    case 'n': // 换行
+        return '\n';
+    case 'v': // 垂直制表符
+        return '\v';
+    case 'f': // 换页
+        return '\f';
+    case 'r': // 回车
+        return '\r';
+    // 属于GNU C拓展
+    case 'e': // 转义符
+        return 27;
+    default:  // 默认将原字符返回
+        return *P;
+    }
+}
+
+
+/*
+static Token *readStringLiteral(char *Start) {
+    char *End = stringLiteralEnd(Start + 1);
+    char *Buf = calloc(1, End - Start);
+    int Len = 0;
+
+    for (char *P = Start; P < End;) {
+        if (*P == '\\') {
+            Buf[Len++] = readEscapedChar(P + 1);
+            P += 2;
+        } else {
+            Buf[Len++] = *P++;
+        }
     }
 
-    Token *Tok = newToken(TK_STR, Start, P + 1);
-    // 构建 char[] 类型
-    Tok->Ty = arrayOf(TyChar, P - Start);
+    Token *Tok = newToken(TK_STR, Start, End);
+    Tok->Ty = arrayOf(TyChar, Len + 1);
+    Tok->Str = Buf;
 
-    // 拷贝双引号间的内容，结果是\0的char *类型
-    Tok->Str = strndup(Start + 1, P - Start - 1);
+    return Tok;
+}
+*/
+
+
+static Token *readStringLiteral(char *Start) {
+    // 读取到字符串字面量内的最后一个双引号的位置
+    char *End = stringLiteralEnd(Start + 1);
+    // 定义一个与字符串字面量内字符数相同的Buf
+    char *Buf = calloc(1, End - Start);
+    int Len = 0;
+
+    // 将读取后的结果写入Buf
+    for (char *P = Start + 1; P < End;) {
+        if (*P == '\\') {
+            Buf[Len++] = readEscapedChar(P + 1);
+            P += 2;
+        } else {
+            Buf[Len++] = *P++;
+        }
+    }
+
+    // Token这里需要包含带双引号的字符串字面量
+    Token *Tok = newToken(TK_STR, Start, End + 1);
+    // 为\0增加一位
+    Tok->Ty = arrayOf(TyChar, Len +1);
+    Tok->Str = Buf;
     return Tok;
 }
 
