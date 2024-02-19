@@ -140,7 +140,52 @@ static char *stringLiteralEnd(char *P) {
     return P;
 }
 
-static int readEscapedChar(char *P) {
+static int fromHex(char C) {
+    if ('0' <= C && C <= '9') {
+        return C - '0';
+    } else if ('a' <= C && C <= 'f') {
+        return C - 'a' + 10;
+    } 
+    return C - 'A' + 10;
+}
+
+static int readEscapedChar(char **NewPos, char *P) {
+    if (*P >= '0' && *P <= '7') {
+        // 读取一个八进制数字，不能长于三位
+        //\abc = (a*8+b)*8+c
+        int C = *P++ - '0';
+        if (*P >= '0' && *P <= '7') {
+            C = (C << 3) + (*P++ - '0');
+
+            if (*P >= '0' && *P <= '7') {
+                C = (C << 3) + (*P++ - '0');
+            }
+        }
+        *NewPos = P;
+        return C;
+    }
+
+    if (*P == 'x') {
+        P++;
+        // 判断是否为十六进制数字
+        if (!isxdigit(*P)) {
+            errorAt(P, "invalid hex escape sequence");
+        }
+        int C = 0;
+        // 读取一位或多位十六进制数字
+        // \xWXYZ = ((W*16+X)*16+Y)*16+Z
+        for (; isxdigit(*P); P++) {
+            C = (C << 4) + fromHex(*P);
+        }
+
+        *NewPos = P;
+        return C;
+    }
+
+        
+        
+    *NewPos = P + 1;
+
     switch(*P) {
     case 'a': // 响铃 (警报)
         return '\a';
@@ -164,30 +209,31 @@ static int readEscapedChar(char *P) {
     }
 }
 
-
 /*
-static Token *readStringLiteral(char *Start) {
-    char *End = stringLiteralEnd(Start + 1);
-    char *Buf = calloc(1, End - Start);
-    int Len = 0;
-
-    for (char *P = Start; P < End;) {
-        if (*P == '\\') {
-            Buf[Len++] = readEscapedChar(P + 1);
-            P += 2;
-        } else {
-            Buf[Len++] = *P++;
-        }
+static int readEscapedChar(char *P) {
+    switch(*P) {
+    case 'a': // 响铃 (警报)
+        return '\a';
+    case 'b': // 退格
+        return '\b';
+    case 't': // 水平指标符
+        return '\t';
+    case 'n': // 换行
+        return '\n';
+    case 'v': // 垂直制表符
+        return '\v';
+    case 'f': // 换页
+        return '\f';
+    case 'r': // 回车
+        return '\r';
+    // 属于GNU C拓展
+    case 'e': // 转义符
+        return 27;
+    default:  // 默认将原字符返回
+        return *P;
     }
-
-    Token *Tok = newToken(TK_STR, Start, End);
-    Tok->Ty = arrayOf(TyChar, Len + 1);
-    Tok->Str = Buf;
-
-    return Tok;
 }
 */
-
 
 static Token *readStringLiteral(char *Start) {
     // 读取到字符串字面量内的最后一个双引号的位置
@@ -199,8 +245,8 @@ static Token *readStringLiteral(char *Start) {
     // 将读取后的结果写入Buf
     for (char *P = Start + 1; P < End;) {
         if (*P == '\\') {
-            Buf[Len++] = readEscapedChar(P + 1);
-            P += 2;
+            Buf[Len++] = readEscapedChar(&P, P + 1);
+            //P += 2;
         } else {
             Buf[Len++] = *P++;
         }
