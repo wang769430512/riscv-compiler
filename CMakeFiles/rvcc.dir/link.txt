@@ -1,0 +1,1 @@
+/usr/bin/cc -std=c11 -g -fno-common CMakeFiles/rvcc.dir/main.c.o CMakeFiles/rvcc.dir/string.c.o CMakeFiles/rvcc.dir/tokenize.c.o CMakeFiles/rvcc.dir/parse.c.o CMakeFiles/rvcc.dir/codegen.c.o CMakeFiles/rvcc.dir/type.c.o -o rvcc 

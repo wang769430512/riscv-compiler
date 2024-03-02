@@ -1,0 +1,34 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/wang/dev/rvcc/codegen.c
+rvcc.h
+/home/wang/dev/rvcc/rvcc.h
+
+/home/wang/dev/rvcc/rvcc.h
+assert.h
+-
+ctype.h
+-
+errno.h
+-
+stdarg.h
+-
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+stdbool.h
+-
+
+/home/wang/dev/rvcc/tokenize.c
+rvcc.h
+/home/wang/dev/rvcc/rvcc.h
+

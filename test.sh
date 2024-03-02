@@ -17,8 +17,8 @@ assert() {
 
     input="$2"
 
-    ./rvcc "$input" > tmp.s || exit
-    
+    # ./rvcc "$input" > tmp.s || exit
+    echo "$input" | ./rvcc - > tmp.s || exit
     # clang -static -o tmp tmp.s tmp2.o
     riscv64-unknown-linux-gnu-gcc -static -o tmp tmp.s tmp2.o
 
@@ -216,5 +216,14 @@ assert 0 'int main() { return "\x00"[0]; }'
 assert 119 'int main() { return "\x77"[0]; }'
 assert 165 'int main() { return "\xA5"[0]; }'
 assert 255 'int main() { return "\x00ff"[0]; }'
+
+# [39] 添加语句表达式
+assert 0 'int main() { return ({ 0; }); }'
+assert 2 'int main() { return ({ 0; 1; 2; }); }'
+assert 1 'int main() { ({0; return 1; 2; }); return 3; }'
+assert 6 'int main() { return ({ 1; }) + ({ 2; }) + ({ 3; }); }'
+assert 3 'int main() { return ({ int x=3; x; }); }'
+
+# [40]
 
 echo OK

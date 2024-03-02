@@ -1,0 +1,3 @@
+/home/wang/dev/rvcc/CMakeFiles/rebuild_cache.dir
+/home/wang/dev/rvcc/CMakeFiles/edit_cache.dir
+/home/wang/dev/rvcc/CMakeFiles/rvcc.dir

@@ -175,7 +175,12 @@ static Obj *findVar(Token *Tok) {
 // mul = unary ("*" unary | "/" unary)*
 // unary = ("+" | "-" | "*" | "/" | "*" | "&") unary | primary
 // postfix = primary ("[" expr "]")*
-// primary = "(" expr ")" | "sizeof" unary | ident func-args? | str | num
+// primary = "(" "{" stmt+ "}" ")"
+//         | "(" expr ")" 
+//         | "sizeof" unary 
+//         | ident func-args? 
+//         | str 
+//         | num
 
 // funcall = ident "(" (assign ("," assign)*)? ")"
 // // args = "(" ")"
@@ -218,7 +223,7 @@ static Node *compondStmt(Token **Rest, Token *Tok) {
         // 构造完AST之后，添加节点类型
         addType(Cur);
     } 
-
+    // Nd的Body存储了{}内解析的语句
     Nd->Body = Head.Next;
     *Rest = Tok->Next;
 
@@ -672,9 +677,23 @@ static Node *postfix(Token **Rest, Token *Tok) {
 }
 
 // 解析括号、数字、变量
-// primary = "("expr")" | "sizeof" unary  | ident args? | str | num
+// primary = "(" "{" stmt+ "}"")" 
+//          |"("expr")" 
+//          | "sizeof" unary  
+//          | ident args? 
+//          | str 
+//          | num
 static Node *primary(Token **Rest, Token *Tok)
 {
+    // "(" "{" stmt+ "}" ")"
+    if (equal(Tok, "(") && equal(Tok->Next, "{")) {
+        // This is a GNU statement expression.  
+        Node *Nd = newNode(ND_STMT_EXPR, Tok);
+        Nd->Body = compondStmt(&Tok, Tok->Next->Next)->Body;
+        *Rest = skip(Tok, ")");
+        return Nd;
+    }
+        
     // "(" expr ")"
     if (equal(Tok, "("))
     {

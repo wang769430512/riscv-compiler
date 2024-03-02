@@ -1,10 +1,16 @@
+// 使用POSIX.1标准
+// 使用了strndup函数
+
+#define _POSIX_C_SOURCE 200809L
+
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <stdarg.h>
 
 #define _POSIX_C_SOURCE 200809L
 
@@ -16,7 +22,6 @@ typedef struct Node Node;
 //
 
 char *format(char *Fmt, ...);
-
 
 typedef enum
 {
@@ -39,7 +44,6 @@ struct Token
     Type *Ty;       // TK_STR使用
     char *Str;      // 字符串字面量，包括'\0'
 };
-Token *tokenize(char *Input);
 
 void error(char *Fmt, ...);
 //void verrorAt(char *Loc, char *Fmt, va_list VA);
@@ -49,6 +53,9 @@ void errorTok(Token *Tok, char *Fmt, ...);
 bool equal(Token *Tok, char *Str);
 Token *skip(Token *Tok, char *Str);
 bool consume(Token **Rest, Token *Tok, char *Str);
+// 词法分析
+Token *tokenizeFile(char *Path);
+
 // AST的节点类型
 typedef enum
 {
@@ -73,6 +80,7 @@ typedef enum
     ND_BLOCK,  // { ... }, 代码块
     ND_FUNCALL,  //函数调用
     ND_EXPR_STMT, // 表达式语句
+    ND_STMT_EXPR, // 语句表达式
     ND_VAR, // 变量
 } NodeKind;
 
@@ -95,7 +103,8 @@ struct Obj {
     // 函数
     Obj *Params;   // 形参
 
-    Node *Body;    // 函数体
+    // 代码块 或 语句表达式
+    Node *Body;    
     Obj *Locals;   // 本地变量
     int StackSize; // 栈大小
 };

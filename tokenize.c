@@ -1,5 +1,9 @@
 #include "rvcc.h"
 
+// 输入的文件名
+static char *CurrentFilename;
+
+// 输入的字符串
 static char *CurrentInput;
 
 void error(char *Fmt, ...) {
@@ -16,9 +20,61 @@ void error(char *Fmt, ...) {
 }
 
 static void verrorAt(char *Loc, char *Fmt, va_list VA) {
-    fprintf(stderr, "%s\n", CurrentInput);
+/*
+    char *Line = Loc;
+    while (CurrentInput < Line && Line[-1] != '\n') {
+        Line--;
+    }
 
-    int Pos = Loc - CurrentInput;
+    char *End = Loc;
+    while (*End != '\n') {
+        End++;
+    }
+
+    int LineNo = 1;
+    for (char *P = CurrentInput; P < Line; P++) {
+        if (*P == '\n') {
+            LineNo++;
+        }
+    }
+
+    int Indent = fprintf(stderr, "%s:%d", CurrentFilename, LineNo);
+    fprintf(stderr, "%.*s", (int)(End - Line), Line);
+    int Pos = Line - Loc + Indent;
+*/
+    // 查找包含loc的行
+    char *Line = Loc;
+    // Line递减到当前行的最开始的位置
+    // Line<CurrentInput, 判断是否读取到文件最开始的位置
+    // Line[-1] != '\n', Line字符串前一个字符是否为换行符(上一行末尾)
+    while (CurrentInput < Line && Line[-1] != '\n') {
+        Line--;
+    }
+
+    // End递增到行位的换行符
+    char *End = Loc;
+    while (*End != '\n') {
+        End++;
+    }
+
+    // 获取行号
+    int LineNo = 1;
+    for (char *P = CurrentInput; P < Line; P++) {
+        // 遇到换行符则行号+1
+        if (*P == '\n') {
+            LineNo++;
+        }
+    }
+
+    // 输出 文件名:错误行
+    // Indent记录输出了多少个字符
+    int Indent = fprintf(stderr, "%s:%d: ", CurrentFilename, LineNo);
+    // 输出Line的行内所有字符(不含换行符)
+    fprintf(stderr, "%.*s\n", (int)(End - Line), Line);
+    // 计算错误信息位置，在当前行内的偏移量+前面输出了多少个字符
+    int Pos = Loc - Line + Indent;
+
+    //int Pos = Loc - CurrentInput;
 
     fprintf(stderr, "%*s", Pos, "");
     fprintf(stderr, "^ ");
@@ -209,32 +265,6 @@ static int readEscapedChar(char **NewPos, char *P) {
     }
 }
 
-/*
-static int readEscapedChar(char *P) {
-    switch(*P) {
-    case 'a': // 响铃 (警报)
-        return '\a';
-    case 'b': // 退格
-        return '\b';
-    case 't': // 水平指标符
-        return '\t';
-    case 'n': // 换行
-        return '\n';
-    case 'v': // 垂直制表符
-        return '\v';
-    case 'f': // 换页
-        return '\f';
-    case 'r': // 回车
-        return '\r';
-    // 属于GNU C拓展
-    case 'e': // 转义符
-        return 27;
-    default:  // 默认将原字符返回
-        return *P;
-    }
-}
-*/
-
 static Token *readStringLiteral(char *Start) {
     // 读取到字符串字面量内的最后一个双引号的位置
     char *End = stringLiteralEnd(Start + 1);
@@ -268,7 +298,9 @@ static void convertKeywords(Token *Tok) {
     }
 }
 
-Token *tokenize(char *P) {
+// 终结符解析，文件名，文件内容
+Token *tokenize(char* Filename, char *P) {
+    CurrentFilename = Filename;
     CurrentInput = P;
     Token Head = {};
     Token *Cur = &Head;
@@ -322,3 +354,94 @@ Token *tokenize(char *P) {
     convertKeywords(Head.Next);
     return Head.Next;
 }
+
+/*
+static char *readFile(char *Path) {
+    FILE *FP;
+    if (strcmp(Path, "-") == 0) {
+        FP = stdin;
+    } else {
+        FP = fopen(Path, "r");
+    }
+
+    char *Buf;
+    size_t BufLen;
+    FILE *Out = open_memstream(&Buf, &BufLen);
+
+    while (true) {
+        char Buf2[4096];
+        int N = fread(Buf2, 1, sizeof(Buf2), FP);
+        if (N == 0) {
+            break;
+        }
+
+        fwrite(Buf, 1, N, Out);
+    }
+    if (FP != stdin) {
+        fclose(FP);
+    }
+    
+    fflush(Out);
+    if (BufLen == 0 || Buf[BufLen - 1] == '\n') {
+        fputc('\n', Out);
+    }
+
+    fputc('\0', Out);
+    fclose(Out);
+    return Buf;
+}
+*/
+
+static char *readFile(char *Path) {
+    FILE *FP;
+
+    if (strcmp(Path, "-") == 0) {
+        // 如果文件名是"-",那么就从输入中读取
+        FP = stdin;
+    } else {
+        FP = fopen(Path, "r");
+        if (!FP) {
+            // errno为系统最后一次的错误代码
+            // strerror以字符串的形式输出错误代码
+            error("Cannot open %s : %s", Path, strerror(errno));
+        }
+    }
+
+    // 要返回的字符串
+    char *Buf;
+    size_t BufLen;
+    FILE *Out = open_memstream(&Buf, &BufLen);
+
+    // 读取整个文件
+    while (true) {
+        char Buf2[4096];
+        // fread从文件流中读取数据到数组中
+        // 数组指针Buf2，数组元素大小1，数组元素个数4096，文件流指针
+        int N = fread(Buf2, 1, sizeof(Buf2), FP);
+        if (N == 0) {
+            break;
+        }
+
+        // 数组指针Buf2,数组元素大小1，实际元素个数N，文件流指针
+        fwrite(Buf2, 1, N, Out);
+    }
+
+    // 对文件完成了读取
+    if (FP != stdin) {
+        fclose(FP);
+    }
+
+    // 刷新流的输出缓冲区，确保内容都被输出到流中
+    fflush(Out);
+    // 确保最后一行以'\n'结尾
+    if (BufLen == 0 || Buf[BufLen - 1] != '\n') {
+        // 将字符输出到流中
+        fputc('\n', Out);
+    }
+    fputc('\0', Out);
+    fclose(Out);
+    return Buf;
+}
+
+// 对文件进行词法分析
+Token *tokenizeFile(char *Path) { return tokenize(Path, readFile(Path)); }
