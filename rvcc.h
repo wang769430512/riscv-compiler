@@ -183,4 +183,7 @@ Type *funcType(Type *ReturnTy);
 
 // 构建一个指针类型，并指向基类
 Type *pointerTo(Type *Base);
-void codegen(Obj *Prog);
+
+
+// 代码生成入口函数
+void codegen(Obj *Prog, FILE *Out);

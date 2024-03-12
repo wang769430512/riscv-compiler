@@ -18,7 +18,8 @@ assert() {
     input="$2"
 
     # ./rvcc "$input" > tmp.s || exit
-    echo "$input" | ./rvcc - > tmp.s || exit
+    # echo "$input" | ./rvcc - > tmp.s || exit
+    echo "$input" | ./rvcc -o tmp.s - || exit
     # clang -static -o tmp tmp.s tmp2.o
     riscv64-unknown-linux-gnu-gcc -static -o tmp tmp.s tmp2.o
 
