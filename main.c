@@ -1,4 +1,4 @@
-#include "rvcc.h" 
+#include "rvcc.h"
 
 // 目标文件的路径
 static char *Opt0;
@@ -7,10 +7,45 @@ static char *Opt0;
 static char *InputPath;
 
 // 输出程序的使用说明
-static void usage(int Status) {
-    fprintf(stderr, "rvcc [ -o <path> ] <file>\n");
+static void usage(int Status)
+{
+    fprintf(stderr, "./rvcc [ -o <path> ] <file>\n");
     exit(Status);
 }
+
+#if 0
+static void parseArgs(int Argc, char **Argv) 
+{
+    for (int I = 1; I < Argc; I++) {
+        if (!strcmp(Argv[I], "--help")) {
+            usage(0);
+        }
+
+        if (!strcmp(Argv[I], "-o")) {
+            if (!Argv[++I]) {
+                usage(1);
+            }
+            Opt0 = Argv[I];
+            continue;
+        }
+
+        if (!strncmp(Argv[I], "-o", 2)) {
+            Opt0 = Argv[I] + 2;
+            continue;
+        }
+
+        if (Argv[I][0] == '-' && Argv[I][1]!='\0') {
+            error("unkown argumens: %s", Argv[I]);
+        }
+
+        InputPath = Argv[I];
+    }
+
+    if (!InputPath) {
+        error("no input files");
+    }
+}
+#endif
 
 //解析传入程序的参数
 static void parseArgs(int Argc, char **Argv) {
@@ -55,37 +90,34 @@ static void parseArgs(int Argc, char **Argv) {
 }
 
 // 打开需要写入的文件
-static FILE *openFile(char *Path) {
-    if (!Path || strcmp(Path, "-") == 0) {
+static FILE *openFile(char *Path)
+{
+    if (!Path || strcmp(Path, "-") == 0)
+    {
         return stdout;
     }
 
     // 以写入模式打开文件
     FILE *Out = fopen(Path, "w");
-    if (!Out) {
-        error("cannot open output file: %s: %s", Path, strerror(errno));
+    if (!Out)
+    {
+        error("cannot open output file: %s: %s\n", Path, strerror(errno));
     }
-
     return Out;
 }
 
 int main(int Argc, char **Argv)
 {
-    
-    // if (argc != 2)
-    // {
-    //     error("%s: invalid number of arguments", Argv[0]);
-    // }
     parseArgs(Argc, Argv);
-    
+
     // 解释Argv[1],生成终结符流
     Token *Tok = tokenizeFile(InputPath);
 
-    // 解释终结符流  
+    // 解释终结符流
     Obj *Prog = parse(Tok);
 
     FILE *Out = openFile(Opt0);
     codegen(Prog, Out);
-    
+
     return 0;
 }
