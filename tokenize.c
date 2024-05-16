@@ -306,6 +306,24 @@ Token *tokenize(char* Filename, char *P) {
     Token *Cur = &Head;
 
     while (*P) {
+        // 跳过行注释
+        if (startsWith(P, "//")) {
+            P += 2;
+            while (*P != '\n') {
+                P++;
+            }
+            continue;
+        }
+
+        // 跳过块注释
+        if (startsWith(P, "/*")) {
+            char *Q = strstr(P, "*/");
+            if (!Q) {
+                errorAt(P, "unclosed the block comment");
+            }
+            P = Q + 2;
+            continue;
+        }
         // 跳过所有空白符，如：空白、回车
         if (isspace(*P)) {
             ++P;
