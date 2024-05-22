@@ -16,8 +16,8 @@ struct Scope {
 };
 
 // 在解析时，全部的变量实例都被累加到这个列表里
-Obj* Locals;  // 局部变量
-Obj* Globals; // 全局变量
+Obj *Locals;  // 局部变量
+Obj *Globals; // 全局变量
 
 // 所有的域的链表
 static Scope *Scp = &(Scope){};
@@ -157,28 +157,7 @@ static Node *newVarNode(Obj *Var, Token *Tok) {
     return Nd;
 }
 
-/*
-static Obj *findVar(Token *Tok) {
-    for (Obj *Var=Locals; Var; Var=Var->Next) {
-        // 判断变量名是否和终结符名长度一致，然后逐字比较。
-        if (strlen(Var->Name) == Tok->Len && 
-            !strncmp(Var->Name, Tok->Loc, Tok->Len)) {
-            return Var;
-        } 
-    }
 
-    // 查找Globals变量中是否存在同名变量
-    for (Obj *Var=Globals; Var; Var = Var->Next) {
-        // 判断变量名是否和终结符名长度一致，然后逐字比较
-        if (strlen(Var->Name) == Tok->Len &&
-            !strncmp(Var->Name, Tok->Loc, Tok->Len)) {
-            return Var;
-        }
-    }
-
-    return NULL;
-}
-*/
 
 // program = functionDefinition*
 // functionDefinition = declspec declarator "{" compoundStmt*
@@ -632,14 +611,14 @@ static Node *relational(Token **Rest, Token *Tok) {
         }
 
         // x >= y
-        // x < y
+        // y <= x
         if (equal(Tok, ">=")) {
-            Nd = newBinary(ND_LT, add(&Tok, Tok->Next), Nd, Start);
+            Nd = newBinary(ND_LE, add(&Tok, Tok->Next), Nd, Start);
             continue;
         }
 
         if (equal(Tok, ">")) {
-            Nd = newBinary(ND_LE, add(&Tok, Tok->Next), Nd, Start);
+            Nd = newBinary(ND_LT, add(&Tok, Tok->Next), Nd, Start);
             continue;
         }
 
@@ -775,7 +754,8 @@ static Node *primary(Token **Rest, Token *Tok)
 
     // "sizeof" unary
     if (equal(Tok, "sizeof")) {
-        Node *Nd = expr(Rest, Tok->Next);
+        //Node *Nd = expr(Rest, Tok->Next);
+        Node *Nd = unary(Rest, Tok->Next);
         addType(Nd);
         return newNum(Nd->Ty->Size, Tok);
     }
