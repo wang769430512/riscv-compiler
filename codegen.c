@@ -69,6 +69,11 @@ static void genAddr(Node *Nd) {
     case ND_DEREF:
         genExpr(Nd->LHS);
         return;
+    // 逗号
+    case ND_COMMA:
+        genExpr(Nd->LHS);
+        genAddr(Nd->RHS);
+        return;
     default:
         break;
     }
@@ -104,6 +109,8 @@ static void store(Type *Ty) {
 
 static void genExpr(Node *Nd)
 {
+    // .loc 文件编号 行号
+    printLn("  .loc 1 %d", Nd->Tok->LineNo);
     switch (Nd->Kind) {
     case ND_NUM:
         printLn("  li a0, %d", Nd->Val);
@@ -136,6 +143,10 @@ static void genExpr(Node *Nd)
         for (Node *N = Nd->Body; N; N = N->Next) {
             genStmt(N);
         }
+        return;
+    case ND_COMMA:
+        genExpr(Nd->LHS);
+        genExpr(Nd->RHS);
         return;
     // 函数调用
     case ND_FUNCALL: {
@@ -213,6 +224,7 @@ static void genExpr(Node *Nd)
 }
 
 static void genStmt(Node *Nd) {
+    // .loc 文件编号 行号
     switch(Nd->Kind) {
         case ND_IF: {
             // 代码段计数

@@ -19,29 +19,7 @@ void error(char *Fmt, ...) {
     exit(1);
 }
 
-static void verrorAt(char *Loc, char *Fmt, va_list VA) {
-/*
-    char *Line = Loc;
-    while (CurrentInput < Line && Line[-1] != '\n') {
-        Line--;
-    }
-
-    char *End = Loc;
-    while (*End != '\n') {
-        End++;
-    }
-
-    int LineNo = 1;
-    for (char *P = CurrentInput; P < Line; P++) {
-        if (*P == '\n') {
-            LineNo++;
-        }
-    }
-
-    int Indent = fprintf(stderr, "%s:%d", CurrentFilename, LineNo);
-    fprintf(stderr, "%.*s", (int)(End - Line), Line);
-    int Pos = Line - Loc + Indent;
-*/
+static void verrorAt(int LineNo, char *Loc, char *Fmt, va_list VA) {
     // 查找包含loc的行
     char *Line = Loc;
     // Line递减到当前行的最开始的位置
@@ -55,15 +33,6 @@ static void verrorAt(char *Loc, char *Fmt, va_list VA) {
     char *End = Loc;
     while (*End != '\n') {
         End++;
-    }
-
-    // 获取行号
-    int LineNo = 1;
-    for (char *P = CurrentInput; P < Line; P++) {
-        // 遇到换行符则行号+1
-        if (*P == '\n') {
-            LineNo++;
-        }
     }
 
     // 输出 文件名:错误行
@@ -84,16 +53,21 @@ static void verrorAt(char *Loc, char *Fmt, va_list VA) {
 }
 
 void errorAt(char *Loc, char *Fmt, ...) {
+    int LineNo = 1;
+    for (char *P = CurrentInput; P < Loc; P++)
+        if (*P == '\n')
+            LineNo++;
+
     va_list VA;
     va_start(VA, Fmt);
-    verrorAt(Loc, Fmt, VA);
+    verrorAt(LineNo, Loc, Fmt, VA);
     exit(1);
 }
 
 void errorTok(Token *Tok, char *Fmt, ...) {
     va_list VA;
     va_start(VA, Fmt);
-    verrorAt(Tok->Loc, Fmt, VA);
+    verrorAt(Tok->LineNo, Tok->Loc, Fmt, VA);
     exit(1);
 }
 
@@ -173,10 +147,6 @@ static bool isKeyword(Token *Tok) {
             return true;
         }
     }
-    // for (char * kw = KW[0]; kw; kw++)
-    // if (equal(Tok, kw)) {
-    //     return true;
-    // } 
 
     return false;
 }
@@ -298,6 +268,23 @@ static void convertKeywords(Token *Tok) {
     }
 }
 
+// 为所有Token添加行号
+static void addLineNumbers(Token *Tok) {
+    char *P = CurrentInput;
+    int N = 1;
+
+    do {
+        if (P == Tok->Loc) {
+            Tok->LineNo = N;
+            Tok = Tok->Next;
+        }
+
+        if (*P == '\n') {
+            N++;
+        }
+    } while(*P++);
+}
+
 // 终结符解析，文件名，文件内容
 Token *tokenize(char* Filename, char *P) {
     CurrentFilename = Filename;
@@ -369,46 +356,11 @@ Token *tokenize(char* Filename, char *P) {
         errorAt(P, "invalid token");
     }
     Cur->Next = newToken(TK_EOF, P, P);
+    // 为所有Token添加行号
+    addLineNumbers(Head.Next);
     convertKeywords(Head.Next);
     return Head.Next;
 }
-
-/*
-static char *readFile(char *Path) {
-    FILE *FP;
-    if (strcmp(Path, "-") == 0) {
-        FP = stdin;
-    } else {
-        FP = fopen(Path, "r");
-    }
-
-    char *Buf;
-    size_t BufLen;
-    FILE *Out = open_memstream(&Buf, &BufLen);
-
-    while (true) {
-        char Buf2[4096];
-        int N = fread(Buf2, 1, sizeof(Buf2), FP);
-        if (N == 0) {
-            break;
-        }
-
-        fwrite(Buf, 1, N, Out);
-    }
-    if (FP != stdin) {
-        fclose(FP);
-    }
-    
-    fflush(Out);
-    if (BufLen == 0 || Buf[BufLen - 1] == '\n') {
-        fputc('\n', Out);
-    }
-
-    fputc('\0', Out);
-    fclose(Out);
-    return Buf;
-}
-*/
 
 static char *readFile(char *Path) {
     FILE *FP;

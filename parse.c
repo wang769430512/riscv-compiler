@@ -177,7 +177,7 @@ static Node *newVarNode(Obj *Var, Token *Tok) {
 //        | "{" compondStmt 
 //        | exprStmt
 // exprStmt = expr? ";"
-// expr = assign
+// expr = assign ("," expr)?
 // assign = equality ("=" assign)?
 // equality = relational("==" relational | "!=" relational )*
 // relational = add("<=" add | "<" add | ">=" add | ">" add)*
@@ -556,9 +556,18 @@ static Node *exprStmt(Token **Rest, Token *Tok) {
     return Nd;
 }
 
-// expr = equality
+// expr = assign ("," expr)?
 static Node *expr(Token **Rest, Token *Tok) {
-    return assign(Rest, Tok);
+    
+    Node *Nd = assign(&Tok, Tok);
+
+    if (equal(Tok, ",")) {
+        return newBinary(ND_COMMA, Nd, expr(Rest, Tok->Next), Tok);
+    }
+
+    *Rest = Tok;
+
+    return Nd;
 }
 
 // assign = equality ("=" assign)?

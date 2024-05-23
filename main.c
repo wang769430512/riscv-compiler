@@ -116,7 +116,10 @@ int main(int Argc, char **Argv)
     // 解释终结符流
     Obj *Prog = parse(Tok);
 
+    // 生成代码
     FILE *Out = openFile(Opt0);
+    // .file 文件编号 文件名
+    fprintf(Out, ".file 1 \"%s\"\n", InputPath);
     codegen(Prog, Out);
 
     return 0;

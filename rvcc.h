@@ -43,6 +43,8 @@ struct Token
     int Len;        // 长度
     Type *Ty;       // TK_STR使用
     char *Str;      // 字符串字面量，包括'\0'
+
+    int LineNo;     // 行号
 };
 
 void error(char *Fmt, ...);
@@ -75,6 +77,7 @@ typedef enum
     ND_DEREF,  // 解引用 *
     ND_RETURN, // return
     ND_ASSIGN, // 赋值
+    ND_COMMA,  // , 逗号
     ND_IF,
     ND_FOR, // "for" or "while"
     ND_BLOCK,  // { ... }, 代码块
