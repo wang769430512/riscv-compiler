@@ -16,6 +16,7 @@
 
 typedef struct Type Type;
 typedef struct Node Node;
+typedef struct Member Member;
 
 //
 // 字符串
@@ -78,6 +79,7 @@ typedef enum
     ND_RETURN, // return
     ND_ASSIGN, // 赋值
     ND_COMMA,  // , 逗号
+    ND_MEMBER, // . 结构体成员访问
     ND_IF,
     ND_FOR, // "for" or "while"
     ND_BLOCK,  // { ... }, 代码块
@@ -132,6 +134,8 @@ struct Node
     // 代码块
     Node *Body;
 
+    Member *Mem;
+
     // 函数调用
     char *FuncName; // 函数名
     Node *Args;     // 函数参数
@@ -144,11 +148,12 @@ Obj *parse(Token *Tok);
 
 // 类型种类
 typedef enum {
-    TY_CHAR,  // char类型
-    TY_INT,   // int整形
-    TY_PTR,   // 指针
-    TY_FUNC,  // 函数
-    TY_ARRAY, // 数组
+    TY_CHAR,   // char类型
+    TY_INT,    // int整形
+    TY_PTR,    // 指针
+    TY_FUNC,   // 函数
+    TY_ARRAY,  // 数组
+    TY_STRUCT, // 结构体
 } TypeKind;
 
 struct Type {
@@ -164,10 +169,21 @@ struct Type {
     // 数组
     int ArrayLen; // 数组长度，元素总个数
 
+    // 结构体
+    Member *Mems;
+
     // 函数类型
     Type *ReturnTy; // 函数返回类型
     Type *Params;   // 形参
     Type *Next;     // 下一类型
+};
+
+// 结构体成员
+struct Member {
+    Member *Next; // 下一成员
+    Type *Ty;     // 类型
+    Token *Name;  // 名称
+    int Offset;   // 偏移量
 };
 
 // 声明全局变量，在type.c中定义全局变量

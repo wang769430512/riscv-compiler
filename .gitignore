@@ -12,6 +12,9 @@ main
 
 /rvcc
 
+# 测试生成的可执行文件
+/test/*.exe
+
 build/
 
 .cache/
