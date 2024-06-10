@@ -25,8 +25,17 @@ int main() {
     ASSERT(32, ({ struct {int a;} x[4]; sizeof(x); }));
     ASSERT(48, ({ struct {int a[3];} x[2]; sizeof(x); }));
     ASSERT(2, ({ struct {char a; char b;}x; sizeof(x); }));
-    ASSERT(9, ({ struct {char a; int b;} x; sizeof(x);}));
     ASSERT(0, ({ struct {}x; sizeof(x); }));
+
+    // [50]对齐结构体成员变量
+    ASSERT(24, ({ struct {char a; int b; char c; } x; sizeof(x); }));
+    ASSERT(16, ({ struct {int a; char b; char c; } x; sizeof(x); }));
+
+    // [52] 支持结构体标签
+    ASSERT(16, ({ struct t {int a; int b;}x; struct t y; sizeof(y); }));
+    ASSERT(16, ({ struct t {int a; char b;}x; struct t y; sizeof(y);}));
+    ASSERT(2, ({ struct t {char a[2];}; { struct t {char a[4];};} struct t y; sizeof(y); }));
+    ASSERT(3, ({ struct t {int x;}; int t=1; struct t y; y.x=2; t+y.x;}));
 
     printf("OK\n");
     return 0;

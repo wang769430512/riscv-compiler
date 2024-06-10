@@ -3,16 +3,28 @@
 // 局部和全局变量的域
 typedef struct VarScope VarScope;
 struct VarScope {
-    VarScope *Next;
-    char *Name;
-    Obj *Var;
+    VarScope *Next; // 下一变量域
+    char *Name;     // 变量域名称  
+    Obj *Var;       // 对应的变量
+};
+
+// 结构体标签的域
+typedef struct TagScope TagScope;
+struct TagScope {
+    TagScope *Next; // 下一标签域
+    char *Name;      // 域名称
+    Type *Ty;        // 域类型
 };
 
 // 表示一个块域
 typedef struct Scope Scope;
 struct Scope {
     Scope *Next;         // 指向上一级的域
-    VarScope *Vars;  // 指向当前域内的变量
+
+    // C有两个域:变量域，结构体标签域
+    VarScope *Vars;
+    TagScope *Tags;
+
 };
 
 // 在解析时，全部的变量实例都被累加到这个列表里
@@ -21,6 +33,18 @@ Obj *Globals; // 全局变量
 
 // 所有的域的链表
 static Scope *Scp = &(Scope){};
+
+// 通过Token查找标签
+static Type *findTag(Token *Tok) {
+    for (Scope *S = Scp; S; S=S->Next) {
+        for (TagScope *S2 = S->Tags; S2; S2=S2->Next) {
+            if (equal(Tok, S2->Name)) {
+                return S2->Ty;
+            }
+        }
+    }
+    return NULL;
+}
 
 static Node *newNode(NodeKind Kind, Token *Tok)
 {
@@ -156,8 +180,6 @@ static Node *newVarNode(Obj *Var, Token *Tok) {
     Nd->Var = Var;
     return Nd;
 }
-
-
 
 // program = functionDefinition*
 // functionDefinition = declspec declarator "{" compoundStmt*
@@ -311,6 +333,15 @@ static int getNumber(Token *Tok) {
         errorTok(Tok, "expected a number");
     }
     return Tok->Val;
+}
+
+// 将标签存入当前的域中
+static void pushTagScope(Token *Tok, Type *Ty) {
+    TagScope *S = calloc(1, sizeof(TagScope));
+    S->Name = strndup(Tok->Loc, Tok->Len);
+    S->Ty = Ty;
+    S->Next = Scp->Tags;
+    Scp->Tags = S;
 }
 
 // declspec = "int" | "char" | structDecl
@@ -761,21 +792,48 @@ static void structMembers(Token **Rest, Token *Tok, Type *Ty) {
 
 // structDecl = "{" structMembers
 static Type *structDecl(Token **Rest, Token *Tok) {
-    Tok = skip(Tok, "{");
+    // 读取结构体标签
+    Token *Tag = NULL;
+    if (Tok->Kind == TK_IDENT) {
+        Tag = Tok;
+        Tok = Tok->Next;
+    }
+
+    if (Tag && !equal(Tok, "{")) {
+        Type *Ty = findTag(Tag);
+        if (!Ty) {
+            errorTok(Tok, "unkown struct type");
+        }
+        *Rest = Tok;
+        return Ty;
+    }
 
     // 构造一个结构体
     Type *Ty = calloc(1, sizeof(Type));
     Ty->Kind = TY_STRUCT;
-    structMembers(Rest, Tok, Ty);
+    structMembers(Rest, Tok->Next, Ty);
+    Ty->Align = 1;
 
     // 计算结构体内成员的偏移量
     int Offset = 0;
     for (Member *Mem = Ty->Mems; Mem; Mem = Mem->Next) {
+        // 对齐成员的偏移量
+        Offset = alignTo(Offset, Mem->Ty->Align);
         Mem->Offset = Offset;
         Offset += Mem->Ty->Size;
-    }
 
-    Ty->Size = Offset;
+        // 偏移量为结构体成员的最大偏移量
+        if (Ty->Align < Mem->Ty->Align)
+            Ty->Align = Mem->Ty->Align;
+    }
+    // 对齐结构体的偏移量
+    Ty->Size = alignTo(Offset, Ty->Align);
+    //Ty->Size = Offset;
+
+    // 如果有名称就注册结构体类型
+    if (Tag) {
+        pushTagScope(Tag, Ty);
+    }
     return Ty;
 }
 

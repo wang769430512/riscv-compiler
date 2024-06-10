@@ -45,7 +45,7 @@ static void pop(char *Reg)
     Depth--;
 }
 
-static int alignTo(int N, int Allign) {
+int alignTo(int N, int Allign) {
     return (N + Allign - 1) / Allign * Allign;
 }
 
@@ -303,6 +303,8 @@ static void assignLVarOffsets(Obj* Prog) {
         for (Obj* Var = Fn->Locals; Var; Var = Var->Next) {
             // 每个变量分配8字节
             Offset += Var->Ty->Size;
+            // 对齐变量
+            Offset = alignTo(Offset, Var->Ty->Align);
             // 为每个变量赋一个偏移量，或者说是栈中地址
             Var->Offset = -Offset;
         }

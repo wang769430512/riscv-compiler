@@ -2,9 +2,18 @@
 #include "rvcc.h"
 
 // {TY_INT}构造了一个数据结构，(Type)强制类型转换为struct
-Type *TyChar = &(Type){TY_CHAR, 1};
+Type *TyChar = &(Type){TY_CHAR, 1, 1};
 // 全局变量TyInt,用来将Type赋值为int类型
-Type *TyInt = &(Type){TY_INT, 8};
+Type *TyInt = &(Type){TY_INT, 8, 8};
+
+// 新建类型
+static Type *newType(TypeKind Kind, int Size, int Align) {
+    Type *Ty = calloc(1, sizeof(Type));
+    Ty->Kind = Kind;
+    Ty->Size = Size;
+    Ty->Align = Align;
+    return Ty;
+}
 
 // 判断type是否为整数
 bool isInteger(Type *Ty) {
@@ -20,9 +29,7 @@ Type *copyType(Type *Ty) {
 
 // 指针类型，并且指向基类
 Type *pointerTo(Type *Base) {
-    Type *Ty = calloc(1, sizeof(Type));
-    Ty->Kind = TY_PTR;
-    Ty->Size = 8;
+    Type *Ty = newType(TY_PTR, 8, 8);
     Ty->Base = Base;
     return Ty;
 }
@@ -37,13 +44,9 @@ Type *funcType(Type *ReturnTy) {
 
 // 构造数组类型，传入数组基类、个数
 Type *arrayOf(Type *Base, int Len) {
-    Type *Ty = calloc(1, sizeof(Type));
-    Ty->Kind = TY_ARRAY;
-    // 数组大小为所有元素大小之和
-    Ty->Size = Base->Size * Len;
+    Type *Ty = newType(TY_ARRAY, Base->Size * Len, Base->Align);
     Ty->Base = Base;
     Ty->ArrayLen = Len;
-
     return Ty;
 }
 

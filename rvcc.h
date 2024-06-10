@@ -159,6 +159,7 @@ typedef enum {
 struct Type {
     TypeKind Kind; // 种类
     int Size;      // 大小，sizeof返回的值
+    int Align;     // 对齐
 
     // 指针
     Type *Base; // 指向的类型
@@ -206,3 +207,4 @@ Type *pointerTo(Type *Base);
 
 // 代码生成入口函数
 void codegen(Obj *Prog, FILE *Out);
+int alignTo(int N, int Align);
