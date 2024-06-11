@@ -131,11 +131,12 @@ static bool isIdent2(char C) {
 }
 
 static int readPunct(char *Ptr) {
-    if (startsWith(Ptr, "==") || startsWith(Ptr, "!=") || startsWith(Ptr, "<=") \
-     || startsWith(Ptr, ">=")) {
-        return 2;
+    static char* KW[] = {"==", "!=", "<=", ">=", "->"};
+    for (int I = 0 ; I < sizeof(KW)/sizeof(*KW); I++) {
+        if (startsWith(Ptr, KW[I])) 
+            return strlen(KW[I]);
     }
-
+    
     return (ispunct(*Ptr)) ? 1:0;    
 } 
 

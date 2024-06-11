@@ -207,7 +207,7 @@ static Node *newVarNode(Obj *Var, Token *Tok) {
 // mul = unary ("*" unary | "/" unary)*
 // unary = ("+" | "-" | "*" | "/" | "*" | "&") unary | primary
 // structMembers = (declspec declarator ("," declarator)* ";")*
-// postfix = primary ("[" expr "]")*
+// postfix = primary ("[" expr "]" | "." ident)* |"->" ident)* 
 // primary = "(" "{" stmt+ "}" ")"
 //         | "(" expr ")" 
 //         | "sizeof" unary 
@@ -799,6 +799,7 @@ static Type *structDecl(Token **Rest, Token *Tok) {
         Tok = Tok->Next;
     }
 
+    // 如果标签存在，且后面不是{,就是返回这个Tag作为类型
     if (Tag && !equal(Tok, "{")) {
         Type *Ty = findTag(Tag);
         if (!Ty) {
@@ -863,7 +864,7 @@ static Node *structRef(Node *LHS, Token *Tok) {
     return Nd;
 }
 
-// postfix = primary ("[" expr "]" | "." ident)*
+// postfix = primary ("[" expr "]" | "." ident)* | "->" ident)*
 static Node *postfix(Token **Rest, Token *Tok) {
     // primary
     Node *Nd = primary(&Tok, Tok);
@@ -885,6 +886,16 @@ static Node *postfix(Token **Rest, Token *Tok) {
             Tok = Tok->Next->Next;
             continue;
         }
+
+        // "->" ident
+        if (equal(Tok, "->")) {
+            // x->y 等价于 (*x).y
+            Nd = newUnary(ND_DEREF, Nd, Tok);
+            Nd = structRef(Nd, Tok->Next);
+            Tok = Tok->Next->Next;
+            continue;
+        }
+        
         *Rest = Tok;
         return Nd;
     }
